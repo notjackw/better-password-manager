@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Create your account</title><link rel="stylesheet" href="style.css">
+<h1>Create your account</h1>
+<form id="f">
+  <label>Name <input name="full_name"></label>
+  <label>Email <input id="email" name="email"></label>
+  <label>Password <input id="p1" type="password" name="password"></label>
+  <label>Confirm password <input id="p2" type="password" name="password_confirm"></label>
+  <button>Create account</button>
+</form>
+<div id="msg"></div>
+<script src="fake.js"></script>
+<script>
+  document.querySelector('#f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    fakeSubmit(document.querySelector('#p1').value, () => { location.href = 'welcome.html'; });
+  });
+</script>

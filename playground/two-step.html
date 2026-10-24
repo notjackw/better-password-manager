@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>Sign in</title><link rel="stylesheet" href="style.css">
+<h1>Sign in</h1>
+<form id="f">
+  <label>Email or phone <input id="identifier" type="email" autocomplete="username"></label>
+  <button>Next</button>
+</form>
+<script>
+  document.querySelector('#f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    location.href = 'two-step-password.html';
+  });
+</script>

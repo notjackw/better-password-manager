@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>App</title><link rel="stylesheet" href="style.css">
+<div id="app">
+  <div class="card">
+    <h2>Log in to App</h2>
+    <div><input id="user" placeholder="Username"></div>
+    <div><input id="pass" type="password" placeholder="Password"></div>
+    <div><div role="button" id="go" tabindex="0">Log in</div></div>
+  </div>
+</div>
+<div id="msg"></div>
+<script src="fake.js"></script>
+<script>
+  document.querySelector('#go').addEventListener('click', () => {
+    fakeSubmit(document.querySelector('#pass').value, () => {
+      document.querySelector('#app').innerHTML = '<h1>Dashboard</h1><p>Signed in.</p>';
+      history.pushState({}, '', '#/dashboard');
+    });
+  });
+</script>

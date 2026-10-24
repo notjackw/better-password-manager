@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Password Manager</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="site" id="site"></div>
+    <div class="actions">
+      <button id="fill" class="primary">Fill login</button>
+      <button id="grab">Save from page</button>
+    </div>
+    <p class="status" id="status" hidden></p>
+  </header>
+
+  <main id="lists">
+    <section id="review-section" hidden>
+      <h2>Needs review</h2>
+      <ul id="review" class="list"></ul>
+    </section>
+    <section>
+      <div class="row">
+        <h2>Saved logins</h2>
+        <button id="add" class="link">+ Add</button>
+      </div>
+      <input id="search" type="search" placeholder="Search sites and usernames">
+      <ul id="vault" class="list"></ul>
+      <p id="empty" class="muted" hidden>Nothing saved yet. Sign in somewhere and it will show up here.</p>
+    </section>
+  </main>
+
+  <form id="editor" hidden>
+    <h2 id="editor-title">Add login</h2>
+    <label>Site <input id="f-site" required placeholder="example.com"></label>
+    <label>Username or email <input id="f-username" autocomplete="off"></label>
+    <label>Password <input id="f-password" required autocomplete="off"></label>
+    <div class="actions">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" id="cancel">Cancel</button>
+    </div>
+  </form>
+
+  <footer>
+    <button id="debug" class="link">Highlight detected fields</button>
+  </footer>
+
+  <script src="../shared/domain.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

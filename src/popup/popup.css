@@ -1,0 +1,77 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --card: #f9fafb;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --warn: #b45309;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111827;
+    --fg: #f9fafb;
+    --muted: #9ca3af;
+    --line: #374151;
+    --card: #1f2937;
+    --accent: #818cf8;
+    --accent-fg: #111827;
+    --warn: #fbbf24;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  width: 360px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+header, section, form, footer { padding: 12px 14px; }
+header { border-bottom: 1px solid var(--line); }
+footer { border-top: 1px solid var(--line); }
+h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.site { font-weight: 600; font-size: 15px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.row { display: flex; justify-content: space-between; align-items: baseline; }
+.actions { display: flex; gap: 8px; }
+.muted { color: var(--muted); }
+.status { margin: 8px 0 0; color: var(--muted); }
+
+button {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.link { border: 0; background: none; padding: 2px 0; color: var(--accent); }
+button.small { padding: 2px 7px; font-size: 12px; }
+
+input {
+  width: 100%;
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+}
+#search { margin-bottom: 8px; }
+label { display: block; margin-bottom: 8px; color: var(--muted); }
+label input { margin-top: 3px; color: var(--fg); }
+
+.list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.list li { padding: 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; background: var(--card); }
+.list li.here { border-color: var(--accent); }
+.entry-top { display: flex; justify-content: space-between; gap: 8px; }
+.entry-site { font-weight: 600; overflow-wrap: anywhere; }
+.entry-user { color: var(--muted); overflow-wrap: anywhere; }
+.entry-pw { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; margin-top: 2px; }
+.entry-status { color: var(--warn); font-size: 12px; margin-top: 2px; }
+.entry-buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }

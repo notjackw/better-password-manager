@@ -1,0 +1,13 @@
+{
+  "name": "password-manager",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "puppeteer": "^23.11.1"
+  }
+}

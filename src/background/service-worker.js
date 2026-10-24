@@ -9,6 +9,8 @@ const PM = globalThis.PM;
 const ATTEMPT_TTL_MS = 2 * 60 * 1000;
 const STEP_TTL_MS = 10 * 60 * 1000;
 const HISTORY_LIMIT = 10;
+const ACTIVITY_LIMIT = 30;
+const TOAST_REPLAY_MS = 8000;
 
 // Serializes read-modify-write cycles on storage so concurrent messages can't clobber each other.
 let queue = Promise.resolve();
@@ -32,10 +34,19 @@ async function updateBadge() {
   await chrome.action.setBadgeText({ text: review.length ? String(review.length) : '' });
 }
 
+// What the extension noticed and decided, newest first, shown under "Recent activity" in the popup.
+// It's how you tell "never saw the login" apart from "saw it but couldn't confirm it worked".
+async function logActivity(text) {
+  const activity = await load('session', 'activity', []);
+  await save('session', 'activity', [{ ts: Date.now(), text }, ...activity].slice(0, ACTIVITY_LIMIT));
+}
+
+const describe = (a) => `${a.kind} on ${a.site}${a.username ? ` (${a.username})` : ' (no username)'}`;
+
 // ---- Vault -----------------------------------------------------------------------------------
 
 // Inserts or updates the login for (site, username). Returns { cred, created, changed, ambiguous }.
-async function upsertCredential({ site, origin, username = '', password, currentPassword = '', kind }) {
+async function upsertCredential({ site, origin, username = '', password, currentPassword = '', kind, pageSite }) {
   const vault = await load('local', 'vault', []);
   const onSite = vault.filter((c) => c.site === site);
   let match = null;
@@ -58,13 +69,27 @@ async function upsertCredential({ site, origin, username = '', password, current
     }
     if (username && !match.username) match.username = username;
     match.updated = now;
+    addSeenOn(match, pageSite);
   } else {
-    match = { id: crypto.randomUUID(), site, origin, username, password, history: [], source: kind, created: now, updated: now };
+    match = newCredential({ site, origin, username, password }, kind);
+    addSeenOn(match, pageSite);
     vault.push(match);
     created = true;
   }
   await save('local', 'vault', vault);
   return { cred: match, created, changed };
+}
+
+// Logins typed into a frame embedded from another site (Disney's login on espn.com) are filed under the
+// frame's site, which is where they get filled again. seenOn remembers the pages they were used on.
+function addSeenOn(cred, pageSite) {
+  if (!pageSite || pageSite === cred.site) return;
+  cred.seenOn = [...new Set([...(cred.seenOn || []), pageSite])];
+}
+
+function newCredential({ site, origin, username = '', password }, source) {
+  const now = Date.now();
+  return { id: crypto.randomUUID(), site, origin, username, password, history: [], source, created: now, updated: now };
 }
 
 // ---- Review queue ----------------------------------------------------------------------------
@@ -101,18 +126,34 @@ async function clearReviewFor(a) {
 
 // ---- Attempts --------------------------------------------------------------------------------
 
-function notifyTab(tabId, msg) {
+// Toasts go to the top page. Sites often reload that page right after a login (espn.com does when its
+// login frame closes), which would wipe the toast, so the next page load in the tab replays it.
+async function notifyTab(tabId, msg) {
+  const toasts = await load('session', 'toasts', {});
+  toasts[tabId] = { msg, ts: Date.now() };
+  await save('session', 'toasts', toasts);
   chrome.tabs.sendMessage(tabId, msg, { frameId: 0 }).catch(() => {});
+}
+
+async function takeToast(tabId) {
+  const toasts = await load('session', 'toasts', {});
+  const t = toasts[tabId];
+  if (!t) return null;
+  delete toasts[tabId];
+  await save('session', 'toasts', toasts);
+  return Date.now() - t.ts < TOAST_REPLAY_MS ? t.msg : null;
 }
 
 async function resolveAttempt(a, outcome) {
   if (outcome !== 'success') {
     await addReview(a, outcome === 'failure' ? 'failed' : 'unconfirmed');
+    await logActivity(`${describe(a)}: ${outcome === 'failure' ? 'looked like it failed' : "couldn't confirm it worked"}, sent to Needs review`);
     return;
   }
   const res = await upsertCredential(a);
   if (res.ambiguous) {
     await addReview(a, 'which-account');
+    await logActivity(`${describe(a)}: worked, but the site has several accounts, sent to Needs review`);
     return;
   }
   await clearReviewFor(a);
@@ -121,13 +162,15 @@ async function resolveAttempt(a, outcome) {
     delete steps[a.tabId];
     await save('session', 'steps', steps);
   }
-  if (!res.created && !res.changed) return; // already in the vault as-is
   const who = res.cred.username ? ` (${res.cred.username})` : '';
-  const verb = !res.created ? 'Updated password' : a.kind === 'login' ? 'Saved login' : 'Saved new account';
-  notifyTab(a.tabId, {
+  // Confirm every recognized login, even one already saved as-is, so silence always means "not seen".
+  const verb = res.created ? (a.kind === 'login' ? 'Saved login' : 'Saved new account')
+    : res.changed ? 'Updated password' : 'Login recognized, already saved';
+  await logActivity(`${describe(a)}: worked. ${verb}`);
+  await notifyTab(a.tabId, {
     type: 'TOAST',
     text: `${verb} for ${a.site}${who}`,
-    undo: { credId: res.cred.id, created: res.created },
+    undo: res.created || res.changed ? { credId: res.cred.id, created: res.created } : null,
   });
 }
 
@@ -156,6 +199,7 @@ const handlers = {
     const steps = await load('session', 'steps', {});
     steps[tabId] = { username, site, ts: Date.now() };
     await save('session', 'steps', steps);
+    await logActivity(`Remembered ${username} from the email step on ${site}`);
     return {};
   },
 
@@ -164,16 +208,20 @@ const handlers = {
     if (tabId == null) return {};
     const now = Date.now();
     const a = { ...attempt, id: crypto.randomUUID(), tabId, frameId: sender.frameId ?? 0, ts: now };
+    if (sender.tab.url) a.pageSite = PM.siteKey(new URL(sender.tab.url).hostname);
 
-    // Multi-step logins (email on one page, password on the next): borrow the earlier username.
-    // Only for logins: a reset or signup page without a username field is a different flow.
-    if (!a.username && a.kind === 'login') {
+    // Multi-step flows (email on one screen, password on the next): borrow the earlier username.
+    // Logins may cross sites (login.live.com -> login.microsoftonline.com); signups must stay on
+    // the same site. Resets never borrow: the reset link may be for a different account entirely.
+    if (!a.username && (a.kind === 'login' || a.kind === 'signup')) {
       const step = (await load('session', 'steps', {}))[tabId];
-      if (step && now - step.ts < STEP_TTL_MS) a.username = step.username;
+      const fresh = step && now - step.ts < STEP_TTL_MS;
+      if (fresh && (a.kind === 'login' || step.site === a.site)) a.username = step.username;
     }
 
     if (a.trigger === 'unload' || a.trigger === 'removed') {
       await addReview(a, 'unconfirmed');
+      await logActivity(`${describe(a)}: caught only as the page closed, sent to Needs review`);
       return {};
     }
 
@@ -184,16 +232,18 @@ const handlers = {
     attempts[tabId] = a;
     await save('session', 'attempts', attempts);
     await chrome.alarms.create('sweep', { delayInMinutes: 3 });
+    await logActivity(`${describe(a)}: submitted, watching whether it worked`);
     return { id: a.id };
   },
 
   // A page finished loading. If its tab has a fresh attempt, this page decides how it went.
   async HELLO(_msg, sender) {
     const tabId = sender.tab?.id;
+    const toast = sender.frameId === 0 ? await takeToast(tabId) : null;
     const a = (await load('session', 'attempts', {}))[tabId];
-    if (!a || Date.now() - a.ts > ATTEMPT_TTL_MS) return {};
-    if (sender.frameId !== 0 && sender.frameId !== a.frameId) return {};
-    return { evaluate: a.id };
+    if (!a || Date.now() - a.ts > ATTEMPT_TTL_MS) return { toast };
+    if (sender.frameId !== 0 && sender.frameId !== a.frameId) return { toast };
+    return { toast, evaluate: a.id };
   },
 
   async OUTCOME({ id, outcome }) {
@@ -237,7 +287,11 @@ const handlers = {
   // ---- Popup ----
 
   async GET_STATE() {
-    return { vault: await load('local', 'vault', []), review: await load('local', 'review', []) };
+    return {
+      vault: await load('local', 'vault', []),
+      review: await load('local', 'review', []),
+      activity: await load('session', 'activity', []),
+    };
   },
 
   async SAVE_CRED({ cred, reviewId }) {
@@ -261,6 +315,29 @@ const handlers = {
     }
     await updateBadge();
     return {};
+  },
+
+  // Bulk import from a password-manager CSV export. Never overwrites: a saved login whose password
+  // differs from the file's goes to review, since the file can't say which one is newer.
+  async IMPORT({ creds }) {
+    const vault = await load('local', 'vault', []);
+    const counts = { added: 0, unchanged: 0, conflicts: 0 };
+    const conflicts = [];
+    for (const c of creds) {
+      const existing = vault.find((v) => v.site === c.site && sameUser(v.username, c.username));
+      if (!existing) {
+        vault.push(newCredential(c, 'import'));
+        counts.added++;
+      } else if (existing.password === c.password) {
+        counts.unchanged++;
+      } else {
+        conflicts.push(c);
+        counts.conflicts++;
+      }
+    }
+    await save('local', 'vault', vault);
+    for (const c of conflicts) await addReview({ ...c, kind: 'import' }, 'import-conflict');
+    return counts;
   },
 
   async DELETE_CRED({ id }) {

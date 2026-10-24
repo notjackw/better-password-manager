@@ -1,0 +1,7 @@
+name,url,username,password,note
+example.com,https://example.com/login,test.user@example.com,first-password,
+login.example.org,https://login.example.org/,someone,"pass,with ""quotes""",has a comma and quotes
+www.example.net,https://www.example.net/account,netuser,net-password-1,
+www.example.net,https://www.example.net/account,netuser,net-password-2,same login twice with a different password
+Some Android app,android://abc123@com.example.app/,appuser,app-password,
+no password row,https://example.com/,blank@example.com,,

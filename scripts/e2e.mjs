@@ -4,6 +4,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
 import puppeteer from 'puppeteer';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -49,7 +50,9 @@ async function step(name, fn) {
     await fn();
     results.push(`✔ ${name}`);
   } catch (err) {
-    results.push(`✖ ${name}\n    ${err.message.split('\n').join('\n    ')}`);
+    const shot = join(tmpdir(), `pm-e2e-fail-${Date.now()}.png`);
+    await page.screenshot({ path: shot }).catch(() => {});
+    results.push(`✖ ${name}\n    ${err.message.split('\n').join('\n    ')}\n    screenshot: ${shot}`);
   }
 }
 
@@ -106,10 +109,51 @@ await step('reset on a site with one account updates it and keeps the old passwo
   assert.equal(find(s.vault, 'solo@x.com').history[0].password, 'old-pw');
 });
 
+await step('login popup in a cross-site frame, email then password, frame closes on success', async () => {
+  await page.goto(local('modal-login.html'));
+  await page.click('#open');
+  const frameHandle = await page.waitForSelector('#login-frame');
+  const frame = await frameHandle.contentFrame();
+  await frame.waitForSelector('#email');
+  await frame.type('#email', 'fan@espn-like.com');
+  await frame.click('button[type=submit]');
+  await frame.waitForSelector('#password');
+  await frame.type('#password', 'frame-pw');
+  await frame.click('button[type=submit]');
+  await page.waitForFunction(() => document.querySelector('#state').textContent === 'Signed in.');
+  const s = await waitFor('vault has fan@espn-like.com', ({ vault }) => find(vault, 'fan@espn-like.com')?.password === 'frame-pw');
+  const cred = find(s.vault, 'fan@espn-like.com');
+  assert.equal(cred.site, '127.0.0.1');
+  assert.deepEqual(cred.seenOn, ['localhost']);
+});
+
 await step('focusing a login field with saved logins opens the autofill menu', async () => {
   await page.goto(local('login.html'));
   await page.focus('#email');
   await page.waitForSelector('pm-ui', { timeout: 3000 });
+});
+
+await step('CSV import adds new logins and sends a conflicting password to review', async () => {
+  const { writeFile } = await import('node:fs/promises');
+  const csvPath = join(tmpdir(), `pm-import-${Date.now()}.csv`);
+  await writeFile(csvPath, 'name,url,username,password,note\n'
+    + `localhost,http://localhost:${port}/login.html,a@b.com,stale-pw,\n`
+    + 'mlb.com,https://www.mlb.com/login,fan@x.com,go-team,\n'
+    + 'app,android://x@com.app/,me,pw,\n');
+  const extId = new URL(swTarget.url()).host;
+  await page.goto(`chrome-extension://${extId}/src/import/import.html`);
+  const input = await page.$('#file');
+  await input.uploadFile(csvPath);
+  await page.click('#go');
+  await page.waitForFunction(() => /Imported|failed/.test(document.querySelector('#result').textContent));
+  const text = await page.$eval('#result', (el) => el.textContent);
+  assert.match(text, /Imported 1 new login\./);
+  assert.match(text, /1 differ/);
+  assert.match(text, /Skipped 1/);
+  const s = await storage();
+  assert.equal(find(s.vault, 'fan@x.com')?.password, 'go-team');
+  assert.equal(find(s.vault, 'a@b.com').password, 'pw-1', 'existing password must not be overwritten');
+  assert.ok(s.review.some((r) => r.username === 'a@b.com' && r.status === 'import-conflict'));
 });
 
 await browser.close();

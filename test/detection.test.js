@@ -221,3 +221,32 @@ test('siteKey groups subdomains under the registrable domain', () => {
   assert.equal(PM.siteKey('localhost'), 'localhost');
   assert.equal(PM.siteKey('192.168.1.10'), '192.168.1.10');
 });
+
+test('brand words inside a hostname do not count as context ("registerdisney" is a login host)', () => {
+  const w = page(`<form><h2>Enter your password</h2><p>fan@x.com</p><input id="p" type="password"><button type="submit">Log In</button></form>`,
+    'https://cdn.registerdisney.go.com/v4/bundle/web/ESPN-ONESITE.WEB/en-US');
+  const g = group(w, '#p');
+  assert.equal(g.kind, 'login');
+  assert.equal(g.current, $(w, '#p'));
+});
+
+test('email-only step that uses autocomplete=email counts as a login step', () => {
+  const w = page(`<form novalidate><h2>Enter your email to continue</h2><input id="e" type="email" autocomplete="email"><button type="submit">Continue</button></form>`,
+    'https://cdn.registerdisney.go.com/v4/bundle/web/ESPN-ONESITE.WEB/en-US');
+  assert.equal(group(w, '#e').kind, 'username-step');
+});
+
+test('identifier-first signup that shows the email as text (MyDisney "Create your account")', () => {
+  const w = page(`
+    <form><h1>Create your account</h1>
+      <p>Choose a password to create your account using <b>fan@x.com</b> <a href="#">(edit)</a></p>
+      <input placeholder="First Name" name="firstName"><input placeholder="Last Name" name="lastName">
+      <input id="p" type="password" placeholder="Choose a password">
+      <label><input type="checkbox"> Yes! Send me offers</label>
+      <button type="submit">Agree &amp; Continue</button>
+    </form>`, 'https://cdn.registerdisney.go.com/v4/bundle/web/ESPN-ONESITE.WEB/en-US');
+  const g = group(w, '#p');
+  assert.equal(g.kind, 'signup');
+  assert.equal(g.username, null);
+  assert.equal(g.new, $(w, '#p'));
+});

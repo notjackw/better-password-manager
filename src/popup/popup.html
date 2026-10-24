@@ -29,6 +29,11 @@
       <ul id="vault" class="list"></ul>
       <p id="empty" class="muted" hidden>Nothing saved yet. Sign in somewhere and it will show up here.</p>
     </section>
+    <details id="activity-section">
+      <summary>Recent activity</summary>
+      <ul id="activity" class="activity"></ul>
+      <p id="activity-empty" class="muted">Nothing noticed since Chrome started.</p>
+    </details>
   </main>
 
   <form id="editor" hidden>
@@ -44,6 +49,7 @@
 
   <footer>
     <button id="debug" class="link">Highlight detected fields</button>
+    <button id="import" class="link">Import passwords (CSV)</button>
   </footer>
 
   <script src="../shared/domain.js"></script>

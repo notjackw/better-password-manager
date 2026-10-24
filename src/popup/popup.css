@@ -32,7 +32,7 @@ body {
 }
 header, section, form, footer { padding: 12px 14px; }
 header { border-bottom: 1px solid var(--line); }
-footer { border-top: 1px solid var(--line); }
+footer { border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
 h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .site { font-weight: 600; font-size: 15px; margin-bottom: 8px; overflow-wrap: anywhere; }
 .row { display: flex; justify-content: space-between; align-items: baseline; }
@@ -75,3 +75,9 @@ label input { margin-top: 3px; color: var(--fg); }
 .entry-pw { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; margin-top: 2px; }
 .entry-status { color: var(--warn); font-size: 12px; margin-top: 2px; }
 .entry-buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+#activity-section { margin-top: 12px; }
+#activity-section summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.activity { list-style: none; margin: 8px 0 0; padding: 0; max-height: 180px; overflow-y: auto; font-size: 12px; }
+.activity li { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.activity time { color: var(--muted); }

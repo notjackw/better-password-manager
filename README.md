@@ -50,6 +50,40 @@ Each problem alone can be survivable. Together, nothing gets saved.
 | No page load to signal success | After submit, the page itself is watched (`src/content/outcome.js`). The password box disappearing (or a 2FA code box appearing) counts as success, with or without a page load. A new error message next to the password box counts as failure. |
 | Still unsure | Nothing is thrown away. Anything that can't be confirmed lands in **Needs review** in the popup. |
 
+### A harder variant: espn.com
+
+On espn.com, **Log In** opens a popup, and the URL doesn't change. The popup is a full-screen
+`<iframe id="oneid-iframe">` from `cdn.registerdisney.go.com`, Disney's shared login (also used by Disney+, ABC and Hulu).
+The ESPN page itself has no login fields at all. Inside the frame it's the same email-then-password,
+no-navigation flow as MLB, and on success ESPN closes the frame.
+
+**Bitwarden, Apple Passwords and Chrome's password manager all fail to save this login.** That's what we
+saw when testing them; their exact logic isn't documented, but each layer below is a known weak spot:
+
+- **The login is in a frame from another site.** The fields belong to `registerdisney.go.com`, not
+  `espn.com`. Managers that look only at the top page, or file logins under the address bar's site, either
+  miss the fields or save them where they're never offered again.
+- **Email and password are on separate screens.** Same problem as MLB: the password screen shows the email
+  as plain text, not in a box, so there's no username to pair with the password.
+- **There's no page load after logging in.** ESPN just closes the frame. Managers that wait for a
+  navigation or a form submit to offer "Save password?" never get that signal.
+
+The extension handles each layer:
+
+- **Login in a frame from another site.** The extension runs inside every frame (`all_frames`), so the
+  frame's fields are detected like any other. The login is filed under the frame's site (`go.com`),
+  which is where it gets filled again, and remembers the page it was used on. The popup shows it as
+  **go.com · used on espn.com** and lists it first while you're on ESPN.
+- **The frame disappears on success.** If the login frame closes while the extension is still watching
+  for the result, and no error has appeared, that counts as success. Otherwise the watcher would die
+  with the frame and the login would end up in Needs review.
+- **Brand names in hostnames.** A hostname counts as login/signup context only when a whole label is an
+  auth word (`login.`, `accounts.`, `sso.`). Without that rule, "regis**ter**disney" read as *register*,
+  and the password step looked like a signup.
+
+`playground/modal-login.html` reproduces this: a `localhost` page that opens a frame from
+`127.0.0.1` (a different site) with email, then password, closing on success.
+
 In `playground/`, the **Two-step login** page tests pairing the email and password, and the
 **Single-page app** page tests detecting success without a page load. `npm run e2e` checks both. No
 playground page combines them on one URL the way MLB does yet.
@@ -97,6 +131,21 @@ Nothing that was typed and submitted is thrown away. Anything that isn't confirm
 - **Popup**: **Fill login**, **Save from page** (grabs what's typed in the page right now), search, edit,
   delete, and the review queue.
 - **Shortcut**: `Alt+Shift+L` fills the best saved login on the page.
+- **Import** (popup footer → *Import passwords (CSV)*): opens a page that reads CSV exports from Chrome,
+  Safari/Apple Passwords or Firefox. New logins are added. A login you already have is never
+  overwritten: if the file's password differs, the file's version goes to Needs review. Android app
+  entries are skipped. Delete the exported CSV afterward, since it holds your passwords in plain text.
+
+### Where the data lives
+
+Everything is stored in `chrome.storage.local`, under the keys `vault` (saved logins) and `review` (Needs review):
+- **Local only:** it stays on this computer and is never synced or sent anywhere.
+- **Private to the extension:** websites and other extensions can't read it.
+- **Not encrypted:** it's a file in your Chrome profile folder, readable by anyone with access to your user account.
+- **Removed with the extension:** uninstalling it deletes the vault.
+
+To look at it yourself: `chrome://extensions` → this extension → *service worker* → console →
+`await chrome.storage.local.get(null)`.
 - **Highlight detected fields** (popup footer): outlines every field with the role and form kind the
   heuristics chose. Use it when a site isn't being recognized.
 

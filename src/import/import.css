@@ -1,0 +1,13 @@
+body { width: auto; }
+main { max-width: 560px; margin: 0 auto; padding: 32px 16px; }
+h1 { font-size: 20px; margin: 0 0 8px; }
+ul { padding-left: 18px; }
+li { margin-bottom: 4px; }
+form { padding: 0; margin: 16px 0; }
+.picker { color: var(--fg); }
+.picker input { padding: 10px; margin-top: 6px; }
+#go { padding: 8px 16px; }
+#go:disabled { opacity: .5; cursor: default; }
+#result { font-size: 14px; white-space: pre-line; }
+#result.error { color: #b91c1c; }
+@media (prefers-color-scheme: dark) { #result.error { color: #f87171; } }

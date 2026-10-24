@@ -77,9 +77,14 @@
     return null;
   };
 
+  // Hostnames only count when a whole label is an auth word (login.example.com, accounts.example.com).
+  // Matching inside labels misfires on brand names: "registerdisney.go.com" is Disney's *login* host.
+  const AUTH_HOST_LABEL = /^(login|signin|auth|sso|account|accounts|id|identity)$/;
+
   function contextScores(root) {
-    const strong = [location.hostname, location.pathname, location.hash];
+    const strong = [location.pathname, location.hash];
     const weak = [document.title];
+    if (location.hostname.split('.').some((label) => AUTH_HOST_LABEL.test(label))) weak.push('log in');
     if (root.tagName === 'FORM') strong.push(...['id', 'name', 'action', 'class'].map((a) => root.getAttribute(a)));
     for (const b of PM.deepQueryAll(root, BUTTON_SELECTOR)) if (!PM.isNonSubmitButton(b)) strong.push(buttonLabel(b));
     let headings = PM.deepQueryAll(root, 'h1, h2, h3, legend, [role="heading"]');
@@ -163,7 +168,9 @@
 
     let kind = null;
     if (slots.current && slots.new) kind = 'change';
-    else if (slots.new) kind = user && !(ctx.reset > ctx.signup) ? 'signup' : 'reset';
+    // With no username box (identifier-first signups show the email as plain text), it's only a
+    // signup if the page says so; otherwise a lone new password is a reset.
+    else if (slots.new) kind = (user ? ctx.reset <= ctx.signup : ctx.signup > ctx.reset) ? 'signup' : 'reset';
     else if (slots.current) kind = 'login';
     else if (otp) kind = 'otp';
     else if (user && ctx.reset === 0 && (ctx.login > 0 || user.acUser)) kind = 'username-step';

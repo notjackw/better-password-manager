@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Import passwords</title>
+  <link rel="stylesheet" href="../popup/popup.css">
+  <link rel="stylesheet" href="import.css">
+</head>
+<body>
+  <main>
+    <h1>Import passwords</h1>
+    <p>Import a CSV file exported from another password manager.</p>
+    <ul class="muted">
+      <li><strong>Chrome:</strong> Settings → Autofill and passwords → Google Password Manager → Settings → Export passwords</li>
+      <li><strong>Safari / Apple Passwords:</strong> File → Export → All Passwords</li>
+      <li><strong>Firefox:</strong> Passwords → ⋯ → Export passwords</li>
+    </ul>
+    <p class="muted">Logins you already have are never overwritten. If the file has a different password
+      for a saved login, the file's version goes to <em>Needs review</em> so you can choose.</p>
+    <form id="form">
+      <label class="picker">
+        <span>1. Choose your exported .csv file</span>
+        <input id="file" type="file" accept=".csv,text/csv" required>
+      </label>
+      <button id="go" class="primary" type="submit" disabled>2. Import</button>
+    </form>
+    <p id="result" role="status"></p>
+  </main>
+  <script src="../shared/domain.js"></script>
+  <script src="../shared/csv.js"></script>
+  <script src="import.js"></script>
+</body>
+</html>

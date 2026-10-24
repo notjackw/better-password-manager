@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><title>Account</title><link rel="stylesheet" href="style.css">
+<style> body { background: #fff; padding: 24px; border-radius: 12px; } </style>
+<div id="step"></div>
+<div id="msg"></div>
+<script src="fake.js"></script>
+<script>
+  // Identifier-first, single-page: the email form is replaced by a password form, no navigation.
+  const step = document.querySelector('#step');
+  let email = '';
+  function showEmail() {
+    step.innerHTML = `<form id="f" novalidate><h2>Enter your email to continue</h2>
+      <input id="email" type="email" autocomplete="email" placeholder="Email">
+      <button type="submit">Continue</button></form>`;
+    document.querySelector('#f').addEventListener('submit', (e) => {
+      e.preventDefault();
+      email = document.querySelector('#email').value;
+      showPassword();
+    });
+  }
+  function showPassword() {
+    step.innerHTML = `<form id="f"><h2>Enter your password</h2><p>${email}</p>
+      <input id="password" type="password" placeholder="Password">
+      <button type="submit">Log In</button></form>`;
+    document.querySelector('#f').addEventListener('submit', (e) => {
+      e.preventDefault();
+      fakeSubmit(document.querySelector('#password').value, () => parent.postMessage('login-ok', '*'));
+    });
+  }
+  showEmail();
+</script>

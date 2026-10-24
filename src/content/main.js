@@ -31,21 +31,24 @@
         return false;
       }
       case 'TOAST':
-        if (window === top) {
-          PM.showToast({
-            text: msg.text,
-            actionLabel: msg.undo ? 'Undo' : '',
-            onAction: () => PM.send({ type: 'UNDO', undo: msg.undo }),
-          });
-        }
+        if (window === top) showToast(msg);
         return false;
       default:
         return false;
     }
   });
 
+  function showToast(msg) {
+    PM.showToast({
+      text: msg.text,
+      actionLabel: msg.undo ? 'Undo' : '',
+      onAction: () => PM.send({ type: 'UNDO', undo: msg.undo }),
+    });
+  }
+
   async function checkPreviousAttempt() {
     const res = await PM.send({ type: 'HELLO' });
+    if (res?.toast && window === top) showToast(res.toast);
     if (!res?.evaluate) return;
     const outcome = await PM.watchOutcome({ navigated: true });
     if (outcome) PM.send({ type: 'OUTCOME', id: res.evaluate, outcome });

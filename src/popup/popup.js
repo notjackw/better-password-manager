@@ -6,6 +6,7 @@ const STATUS_TEXT = {
   unconfirmed: "Couldn't confirm the sign-in worked",
   failed: 'Sign-in looked like it failed',
   'which-account': 'Password changed, but which account?',
+  'import-conflict': 'From your import file, but a different password is already saved',
 };
 
 let tab = null;
@@ -81,9 +82,10 @@ function renderReview(review) {
 
 function renderVault(vault) {
   const q = $('#search').value.trim().toLowerCase();
+  const isHere = (c) => c.site === site || (c.seenOn || []).includes(site);
   const items = vault
-    .filter((c) => !q || c.site.includes(q) || (c.username || '').toLowerCase().includes(q))
-    .sort((a, b) => Number(b.site === site) - Number(a.site === site) || a.site.localeCompare(b.site));
+    .filter((c) => !q || [c.site, ...(c.seenOn || []), c.username || ''].some((t) => t.toLowerCase().includes(q)))
+    .sort((a, b) => Number(isHere(b)) - Number(isHere(a)) || a.site.localeCompare(b.site));
   $('#empty').hidden = vault.length > 0;
   $('#vault').replaceChildren(...items.map((c) => {
     const { line, toggle } = passwordLine(c.password);
@@ -97,9 +99,10 @@ function renderVault(vault) {
       await send({ type: 'DELETE_CRED', id: c.id });
       refresh();
     });
-    return el('li', { className: c.site === site ? 'here' : '' },
+    const usedOn = c.seenOn?.length ? ` · used on ${c.seenOn.join(', ')}` : '';
+    return el('li', { className: isHere(c) ? 'here' : '' },
       el('div', { className: 'entry-top' },
-        el('div', { className: 'entry-site', textContent: c.site })),
+        el('div', { className: 'entry-site', textContent: c.site + usedOn })),
       el('div', { className: 'entry-user', textContent: c.username || '(no username)' }),
       line,
       el('div', { className: 'entry-buttons' },
@@ -111,10 +114,18 @@ function renderVault(vault) {
   }));
 }
 
+function renderActivity(activity) {
+  $('#activity-empty').hidden = activity.length > 0;
+  $('#activity').replaceChildren(...activity.map((a) => el('li', {},
+    el('time', { textContent: new Date(a.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }),
+    ` ${a.text}`)));
+}
+
 async function refresh() {
-  const { vault, review } = await send({ type: 'GET_STATE' });
+  const { vault, review, activity } = await send({ type: 'GET_STATE' });
   renderReview(review);
   renderVault(vault);
+  renderActivity(activity);
 }
 
 function openEditor(values, meta = {}) {
@@ -169,6 +180,12 @@ $('#debug').addEventListener('click', async () => {
   const res = await sendToTab({ type: 'TOGGLE_DEBUG' });
   if (!res) return setStatus('Reload this page so the extension can see it.');
   $('#debug').textContent = res.enabled ? 'Hide field highlights' : 'Highlight detected fields';
+});
+
+// A file picker would close the popup on macOS before the file is read, so import runs in a tab.
+$('#import').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('src/import/import.html') });
+  window.close();
 });
 
 (async () => {

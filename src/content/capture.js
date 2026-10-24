@@ -12,6 +12,7 @@
   let lastSentKey = '';
   let lastSentAt = 0;
   let watchGeneration = 0;
+  let activeWatch = null; // { id, gen } while the page is being watched after a submit
 
   PM.fieldValue = (el) => el.value || lastValues.get(el) || '';
 
@@ -75,7 +76,9 @@
     const gen = ++watchGeneration;
     PM.send({ type: 'ATTEMPT', attempt: { ...creds, trigger } }).then(async (res) => {
       if (!res?.id) return;
+      activeWatch = { id: res.id, gen };
       const outcome = await PM.watchOutcome({ baseline, isCurrent: () => gen === watchGeneration });
+      if (activeWatch?.gen === gen) activeWatch = null;
       if (outcome) PM.send({ type: 'OUTCOME', id: res.id, outcome });
     });
   }
@@ -98,6 +101,12 @@
   }, true);
 
   window.addEventListener('pagehide', () => {
+    // A login frame embedded in another site (e.g. Disney's on espn.com) that closes while we're
+    // still watching, without having shown an error, is the site dismissing it after a good login.
+    if (window !== top && activeWatch) {
+      PM.send({ type: 'OUTCOME', id: activeWatch.id, outcome: 'success' });
+      activeWatch = null;
+    }
     for (const el of filledPasswords) attempt(el.isConnected ? PM.findRoot(el) : rootOf.get(el), 'unload');
   });
 

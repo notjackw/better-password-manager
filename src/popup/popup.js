@@ -121,11 +121,24 @@ function renderActivity(activity) {
     ` ${a.text}`)));
 }
 
+// Which part of the popup is showing: 'lists', 'editor', 'unlock' or 'master'.
+function show(view) {
+  for (const id of ['lists', 'editor', 'unlock', 'master']) $(`#${id}`).hidden = id !== view;
+  $('header').hidden = view === 'unlock';
+}
+
 async function refresh() {
-  const { vault, review, activity } = await send({ type: 'GET_STATE' });
-  renderReview(review);
-  renderVault(vault);
-  renderActivity(activity);
+  const state = await send({ type: 'GET_STATE' });
+  $('#lock').hidden = !state.master || state.locked;
+  $('#set-master').hidden = state.master;
+  renderActivity(state.activity);
+  if (state.locked) {
+    show('unlock');
+    $('#u-password').focus();
+    return;
+  }
+  renderReview(state.review);
+  renderVault(state.vault);
 }
 
 function openEditor(values, meta = {}) {
@@ -134,15 +147,13 @@ function openEditor(values, meta = {}) {
   $('#f-site').value = values.site || site;
   $('#f-username').value = values.username || '';
   $('#f-password').value = values.password || '';
-  $('#lists').hidden = true;
-  $('#editor').hidden = false;
+  show('editor');
   $('#f-username').focus();
 }
 
 function closeEditor() {
   editing = null;
-  $('#editor').hidden = true;
-  $('#lists').hidden = false;
+  show('lists');
 }
 
 $('#editor').addEventListener('submit', async (e) => {
@@ -161,6 +172,50 @@ $('#editor').addEventListener('submit', async (e) => {
 });
 
 $('#cancel').addEventListener('click', closeEditor);
+
+function setError(sel, text) {
+  $(sel).textContent = text;
+  $(sel).hidden = !text;
+}
+
+$('#unlock').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setError('#unlock-error', '');
+  const button = $('#unlock button');
+  button.disabled = true;
+  button.textContent = 'Unlocking…';
+  const res = await send({ type: 'UNLOCK', password: $('#u-password').value });
+  button.disabled = false;
+  button.textContent = 'Unlock';
+  if (res?.error) return setError('#unlock-error', res.error);
+  $('#u-password').value = '';
+  show('lists');
+  if (res?.saved) setStatus(`Saved ${res.saved} login${res.saved > 1 ? 's' : ''} captured while locked.`);
+  refresh();
+});
+
+$('#set-master').addEventListener('click', () => {
+  show('master');
+  $('#m-password').focus();
+});
+$('#master-cancel').addEventListener('click', () => show('lists'));
+
+$('#master').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if ($('#m-password').value !== $('#m-confirm').value) return setError('#master-error', "The two passwords don't match.");
+  setError('#master-error', '');
+  const res = await send({ type: 'SET_MASTER', password: $('#m-password').value });
+  if (res?.error) return setError('#master-error', res.error);
+  $('#m-password').value = $('#m-confirm').value = '';
+  show('lists');
+  setStatus('Your logins are now encrypted.');
+  refresh();
+});
+
+$('#lock').addEventListener('click', async () => {
+  await send({ type: 'LOCK' });
+  refresh();
+});
 $('#add').addEventListener('click', () => openEditor({}));
 $('#search').addEventListener('input', refresh);
 

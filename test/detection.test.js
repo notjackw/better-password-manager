@@ -236,6 +236,18 @@ test('email-only step that uses autocomplete=email counts as a login step', () =
   assert.equal(group(w, '#e').kind, 'username-step');
 });
 
+test('autocomplete=current-password wins over a "confirmation" id (TurboTax password step)', () => {
+  const w = page(`
+    <form action="#"><p>Enter your Intuit password</p><p>fan@x.com</p>
+      <input type="text" name="Email" autocomplete="username">
+      <input id="iux-password-confirmation-password" type="password" name="Password" autocomplete="current-password">
+      <button type="submit">Continue</button><button type="button">Text a code to (***) ***-**09</button>
+    </form>`, 'https://myturbotax.intuit.com/', 'TurboTax® Login - Sign in to Get Started on Your Tax Return');
+  const g = group(w, '#iux-password-confirmation-password');
+  assert.equal(g.kind, 'login');
+  assert.equal(g.current, $(w, '#iux-password-confirmation-password'));
+});
+
 test('identifier-first signup that shows the email as text (MyDisney "Create your account")', () => {
   const w = page(`
     <form><h1>Create your account</h1>

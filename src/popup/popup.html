@@ -15,6 +15,27 @@
     <p class="status" id="status" hidden></p>
   </header>
 
+  <form id="unlock" hidden>
+    <h2>Locked</h2>
+    <p class="muted">Enter your master password to see and fill your logins.</p>
+    <label>Master password <input id="u-password" type="password" required autocomplete="current-password"></label>
+    <p class="error-text" id="unlock-error" hidden></p>
+    <div class="actions"><button type="submit" class="primary">Unlock</button></div>
+  </form>
+
+  <form id="master" hidden>
+    <h2>Set a master password</h2>
+    <p class="muted">Your saved logins will be stored encrypted. You'll enter this password once each time Chrome starts.</p>
+    <label>Master password <input id="m-password" type="password" required minlength="8" autocomplete="new-password"></label>
+    <label>Type it again <input id="m-confirm" type="password" required autocomplete="new-password"></label>
+    <p class="warn-text">If you forget it, your saved logins can't be recovered.</p>
+    <p class="error-text" id="master-error" hidden></p>
+    <div class="actions">
+      <button type="submit" class="primary">Encrypt my logins</button>
+      <button type="button" id="master-cancel">Cancel</button>
+    </div>
+  </form>
+
   <main id="lists">
     <section id="review-section" hidden>
       <h2>Needs review</h2>
@@ -50,6 +71,8 @@
   <footer>
     <button id="debug" class="link">Highlight detected fields</button>
     <button id="import" class="link">Import passwords (CSV)</button>
+    <button id="lock" class="link" hidden>Lock</button>
+    <button id="set-master" class="link" hidden>Set master password</button>
   </footer>
 
   <script src="../shared/domain.js"></script>

@@ -3,7 +3,7 @@
 // Flow: content script reports ATTEMPT on submit -> the page (or the next page, via HELLO) watches
 // what happens -> OUTCOME success saves to the vault; failure/unknown goes to "Needs review" so a
 // credential is never silently lost.
-importScripts('../shared/domain.js');
+importScripts('../shared/domain.js', '../shared/vault-crypto.js');
 
 const PM = globalThis.PM;
 const ATTEMPT_TTL_MS = 2 * 60 * 1000;
@@ -26,12 +26,53 @@ async function load(area, key, fallback) {
 }
 const save = (area, key, value) => chrome.storage[area].set({ [key]: value });
 
+// ---- Encryption -------------------------------------------------------------------------------
+//
+// Without a master password, `vault` and `review` are plain arrays in chrome.storage.local. With one,
+// they're stored encrypted ({ enc: 1, iv, data }), and the key lives only in chrome.storage.session:
+// memory, never written to disk, gone when Chrome quits, and unreadable by content scripts.
+// While locked, finished logins wait in session storage (`lockedQueue`) until the next unlock.
+
+async function getKey() {
+  const jwk = await load('session', 'key', null);
+  return jwk ? PM.importKey(jwk) : null;
+}
+
+async function hasMaster() {
+  return Boolean(await load('local', 'kdf', null));
+}
+
+async function isLocked() {
+  return (await hasMaster()) && !(await load('session', 'key', null));
+}
+
+async function loadSecret(name) {
+  const stored = await load('local', name, []);
+  if (!PM.isEncrypted(stored)) return stored;
+  const key = await getKey();
+  if (!key) throw new Error('locked');
+  return PM.decryptJson(key, stored);
+}
+
+async function saveSecret(name, value) {
+  const key = (await hasMaster()) ? await getKey() : null;
+  if ((await hasMaster()) && !key) throw new Error('locked');
+  await save('local', name, key ? await PM.encryptJson(key, value) : value);
+  if (name === 'review') await save('local', 'reviewCount', value.length); // so the badge works while locked
+}
+
+async function queueWhileLocked(item) {
+  const q = await load('session', 'lockedQueue', []);
+  await save('session', 'lockedQueue', [...q, item]);
+}
+
 const sameUser = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
 
 async function updateBadge() {
-  const review = await load('local', 'review', []);
+  const locked = await isLocked();
+  const count = await load('local', 'reviewCount', 0) + (await load('session', 'lockedQueue', [])).length;
   await chrome.action.setBadgeBackgroundColor({ color: '#d97706' });
-  await chrome.action.setBadgeText({ text: review.length ? String(review.length) : '' });
+  await chrome.action.setBadgeText({ text: count ? String(count) : locked ? '🔒' : '' });
 }
 
 // What the extension noticed and decided, newest first, shown under "Recent activity" in the popup.
@@ -47,7 +88,7 @@ const describe = (a) => `${a.kind} on ${a.site}${a.username ? ` (${a.username})`
 
 // Inserts or updates the login for (site, username). Returns { cred, created, changed, ambiguous }.
 async function upsertCredential({ site, origin, username = '', password, currentPassword = '', kind, pageSite }) {
-  const vault = await load('local', 'vault', []);
+  const vault = await loadSecret('vault');
   const onSite = vault.filter((c) => c.site === site);
   let match = null;
   if (username) match = onSite.find((c) => sameUser(c.username, username));
@@ -76,7 +117,7 @@ async function upsertCredential({ site, origin, username = '', password, current
     vault.push(match);
     created = true;
   }
-  await save('local', 'vault', vault);
+  await saveSecret('vault', vault);
   return { cred: match, created, changed };
 }
 
@@ -95,7 +136,12 @@ function newCredential({ site, origin, username = '', password }, source) {
 // ---- Review queue ----------------------------------------------------------------------------
 
 async function addReview(a, status) {
-  const review = await load('local', 'review', []);
+  if (await isLocked()) {
+    await queueWhileLocked({ review: a, status });
+    await updateBadge();
+    return;
+  }
+  const review = await loadSecret('review');
   const existing = review.find((r) => r.site === a.site && sameUser(r.username, a.username) && r.password === a.password);
   const item = existing || { id: crypto.randomUUID() };
   Object.assign(item, {
@@ -110,16 +156,16 @@ async function addReview(a, status) {
     ts: Date.now(),
   });
   if (!existing) review.unshift(item);
-  await save('local', 'review', review);
+  await saveSecret('review', review);
   await updateBadge();
 }
 
 // After a confirmed save, earlier failed/unconfirmed tries for the same account are noise.
 async function clearReviewFor(a) {
-  const review = await load('local', 'review', []);
+  const review = await loadSecret('review');
   const kept = review.filter((r) => !(r.site === a.site && (sameUser(r.username, a.username) || r.password === a.password)));
   if (kept.length !== review.length) {
-    await save('local', 'review', kept);
+    await saveSecret('review', kept);
     await updateBadge();
   }
 }
@@ -145,6 +191,13 @@ async function takeToast(tabId) {
 }
 
 async function resolveAttempt(a, outcome) {
+  if (await isLocked()) {
+    await queueWhileLocked({ attempt: a, outcome });
+    await logActivity(`${describe(a)}: ${outcome === 'success' ? 'worked' : 'finished'}, waiting for you to unlock`);
+    await notifyTab(a.tabId, { type: 'TOAST', text: `Login captured for ${a.site}. Unlock Password Manager to save it.` });
+    await updateBadge();
+    return;
+  }
   if (outcome !== 'success') {
     await addReview(a, outcome === 'failure' ? 'failed' : 'unconfirmed');
     await logActivity(`${describe(a)}: ${outcome === 'failure' ? 'looked like it failed' : "couldn't confirm it worked"}, sent to Needs review`);
@@ -197,9 +250,13 @@ const handlers = {
     const tabId = sender.tab?.id;
     if (tabId == null) return {};
     const steps = await load('session', 'steps', {});
+    const prev = steps[tabId];
     steps[tabId] = { username, site, ts: Date.now() };
     await save('session', 'steps', steps);
-    await logActivity(`Remembered ${username} from the email step on ${site}`);
+    // One Continue click often fires both click and submit.
+    if (!(prev && prev.username === username && prev.site === site && Date.now() - prev.ts < 5000)) {
+      await logActivity(`Remembered ${username} from the email step on ${site}`);
+    }
     return {};
   },
 
@@ -207,7 +264,7 @@ const handlers = {
     const tabId = sender.tab?.id;
     if (tabId == null) return {};
     const now = Date.now();
-    const a = { ...attempt, id: crypto.randomUUID(), tabId, frameId: sender.frameId ?? 0, ts: now };
+    const a = { ...attempt, id: attempt.id || crypto.randomUUID(), tabId, frameId: sender.frameId ?? 0, ts: now };
     if (sender.tab.url) a.pageSite = PM.siteKey(new URL(sender.tab.url).hostname);
 
     // Multi-step flows (email on one screen, password on the next): borrow the earlier username.
@@ -258,7 +315,8 @@ const handlers = {
   },
 
   async UNDO({ undo }) {
-    const vault = await load('local', 'vault', []);
+    if (await isLocked()) return {};
+    const vault = await loadSecret('vault');
     const cred = vault.find((c) => c.id === undo.credId);
     if (!cred) return {};
     if (undo.created) {
@@ -267,14 +325,15 @@ const handlers = {
       cred.password = cred.history.shift().password;
       cred.updated = Date.now();
     }
-    await save('local', 'vault', vault);
+    await saveSecret('vault', vault);
     return {};
   },
 
   async GET_CREDS(_msg, sender) {
     const origin = sender.origin && sender.origin !== 'null' ? sender.origin : sender.url;
     const site = PM.siteKey(new URL(origin).hostname);
-    const vault = await load('local', 'vault', []);
+    if (await isLocked()) return { creds: [], hint: '', locked: true };
+    const vault = await loadSecret('vault');
     const step = (await load('session', 'steps', {}))[sender.tab?.id];
     const hint = step && Date.now() - step.ts < STEP_TTL_MS ? step.username : '';
     const creds = vault
@@ -287,16 +346,63 @@ const handlers = {
   // ---- Popup ----
 
   async GET_STATE() {
+    const master = await hasMaster();
+    if (await isLocked()) return { master, locked: true, activity: await load('session', 'activity', []) };
     return {
-      vault: await load('local', 'vault', []),
-      review: await load('local', 'review', []),
+      master,
+      locked: false,
+      vault: await loadSecret('vault'),
+      review: await loadSecret('review'),
       activity: await load('session', 'activity', []),
     };
   },
 
+  // Turns on encryption: re-saves the vault and review queue encrypted with a key from the password.
+  async SET_MASTER({ password }) {
+    if (await hasMaster()) return { error: 'A master password is already set.' };
+    const vault = await loadSecret('vault');
+    const review = await loadSecret('review');
+    const kdf = PM.newKdfParams();
+    const key = await PM.deriveKey(password, kdf);
+    await save('session', 'key', await PM.exportKey(key));
+    await save('local', 'kdf', kdf);
+    await saveSecret('vault', vault);
+    await saveSecret('review', review);
+    await logActivity('Master password set. Your vault is now encrypted');
+    return {};
+  },
+
+  async UNLOCK({ password }) {
+    const kdf = await load('local', 'kdf', null);
+    if (!kdf) return {};
+    const key = await PM.deriveKey(password, kdf);
+    const stored = await load('local', 'vault', []);
+    try {
+      if (PM.isEncrypted(stored)) await PM.decryptJson(key, stored);
+    } catch {
+      return { error: 'Wrong master password.' };
+    }
+    await save('session', 'key', await PM.exportKey(key));
+    // Logins finished while locked get saved now.
+    const pending = await load('session', 'lockedQueue', []);
+    await save('session', 'lockedQueue', []);
+    for (const item of pending) {
+      if (item.attempt) await resolveAttempt(item.attempt, item.outcome);
+      else await addReview(item.review, item.status);
+    }
+    await updateBadge();
+    return { saved: pending.length };
+  },
+
+  async LOCK() {
+    await chrome.storage.session.remove('key');
+    await updateBadge();
+    return {};
+  },
+
   async SAVE_CRED({ cred, reviewId }) {
     if (cred.id) {
-      const vault = await load('local', 'vault', []);
+      const vault = await loadSecret('vault');
       const existing = vault.find((c) => c.id === cred.id);
       if (existing) {
         if (existing.password !== cred.password) {
@@ -304,14 +410,14 @@ const handlers = {
             .slice(0, HISTORY_LIMIT);
         }
         Object.assign(existing, { site: cred.site, username: cred.username, password: cred.password, updated: Date.now() });
-        await save('local', 'vault', vault);
+        await saveSecret('vault', vault);
       }
     } else {
       await upsertCredential({ ...cred, kind: 'manual' });
     }
     if (reviewId) {
-      const review = await load('local', 'review', []);
-      await save('local', 'review', review.filter((r) => r.id !== reviewId));
+      const review = await loadSecret('review');
+      await saveSecret('review', review.filter((r) => r.id !== reviewId));
     }
     await updateBadge();
     return {};
@@ -320,7 +426,8 @@ const handlers = {
   // Bulk import from a password-manager CSV export. Never overwrites: a saved login whose password
   // differs from the file's goes to review, since the file can't say which one is newer.
   async IMPORT({ creds }) {
-    const vault = await load('local', 'vault', []);
+    if (await isLocked()) return { error: 'Unlock Password Manager (click its toolbar icon) before importing.' };
+    const vault = await loadSecret('vault');
     const counts = { added: 0, unchanged: 0, conflicts: 0 };
     const conflicts = [];
     for (const c of creds) {
@@ -335,20 +442,20 @@ const handlers = {
         counts.conflicts++;
       }
     }
-    await save('local', 'vault', vault);
+    await saveSecret('vault', vault);
     for (const c of conflicts) await addReview({ ...c, kind: 'import' }, 'import-conflict');
     return counts;
   },
 
   async DELETE_CRED({ id }) {
-    const vault = await load('local', 'vault', []);
-    await save('local', 'vault', vault.filter((c) => c.id !== id));
+    const vault = await loadSecret('vault');
+    await saveSecret('vault', vault.filter((c) => c.id !== id));
     return {};
   },
 
   async DISCARD_REVIEW({ id }) {
-    const review = await load('local', 'review', []);
-    await save('local', 'review', review.filter((r) => r.id !== id));
+    const review = await loadSecret('review');
+    await saveSecret('review', review.filter((r) => r.id !== id));
     await updateBadge();
     return {};
   },

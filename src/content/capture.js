@@ -74,12 +74,18 @@
 
     const baseline = PM.visibleErrors();
     const gen = ++watchGeneration;
-    PM.send({ type: 'ATTEMPT', attempt: { ...creds, trigger } }).then(async (res) => {
-      if (!res?.id) return;
-      activeWatch = { id: res.id, gen };
+    // The id is made here, not by the background, so a login frame that closes before the background
+    // replies can still report success (see pagehide below).
+    const id = crypto.randomUUID();
+    if (!fallback) activeWatch = { id, gen };
+    PM.send({ type: 'ATTEMPT', attempt: { ...creds, id, trigger } }).then(async (res) => {
+      if (!res?.id) {
+        if (activeWatch?.gen === gen) activeWatch = null;
+        return;
+      }
       const outcome = await PM.watchOutcome({ baseline, isCurrent: () => gen === watchGeneration });
       if (activeWatch?.gen === gen) activeWatch = null;
-      if (outcome) PM.send({ type: 'OUTCOME', id: res.id, outcome });
+      if (outcome) PM.send({ type: 'OUTCOME', id, outcome });
     });
   }
 

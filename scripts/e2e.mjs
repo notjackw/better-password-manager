@@ -40,7 +40,9 @@ async function waitFor(desc, check, timeout = 20000) {
     if (check({ vault: last.vault || [], review: last.review || [] })) return last;
     await new Promise((r) => setTimeout(r, 300));
   }
-  throw new Error(`Timed out waiting for: ${desc}\nstorage: ${JSON.stringify(last, null, 2)}`);
+  const session = await worker.evaluate(() => chrome.storage.session.get(null));
+  throw new Error(`Timed out waiting for: ${desc}\nactivity: ${JSON.stringify(session.activity?.map((x) => x.text), null, 2)}`
+    + `\npending attempts: ${JSON.stringify(Object.values(session.attempts || {}).map((x) => `${x.kind} ${x.username}`))}`);
 }
 
 const page = await browser.newPage();
@@ -154,6 +156,42 @@ await step('CSV import adds new logins and sends a conflicting password to revie
   assert.equal(find(s.vault, 'fan@x.com')?.password, 'go-team');
   assert.equal(find(s.vault, 'a@b.com').password, 'pw-1', 'existing password must not be overwritten');
   assert.ok(s.review.some((r) => r.username === 'a@b.com' && r.status === 'import-conflict'));
+});
+
+// Runs last: after this the vault is encrypted, so storage() no longer returns readable logins.
+await step('master password encrypts the vault; logins made while locked are saved on unlock', async () => {
+  const extId = new URL(swTarget.url()).host;
+  const popup = `chrome-extension://${extId}/src/popup/popup.html`;
+  await page.goto(popup);
+  await page.click('#set-master');
+  await page.type('#m-password', 'correct horse');
+  await page.type('#m-confirm', 'correct horse');
+  await page.click('#master button[type=submit]');
+  await page.waitForFunction(() => /encrypted/.test(document.querySelector('#status').textContent));
+  const raw = JSON.stringify(await storage());
+  assert.ok(!raw.includes('pw-1') && !raw.includes('a@b.com'), 'no plaintext logins left in local storage');
+
+  await page.click('#lock');
+  await page.waitForSelector('#unlock:not([hidden])');
+  await fillAndSubmit(local('login.html'), { '#email': 'locked@x.com', '#password': 'locked-pw' });
+  const end = Date.now() + 20000;
+  let queued = [];
+  while (Date.now() < end && !queued.length) {
+    queued = (await worker.evaluate(() => chrome.storage.session.get('lockedQueue'))).lockedQueue || [];
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  assert.equal(queued.length, 1, 'login captured while locked waits in memory');
+
+  await page.goto(popup);
+  await page.type('#u-password', 'wrong one');
+  await page.click('#unlock button[type=submit]');
+  await page.waitForSelector('#unlock-error:not([hidden])');
+  await page.$eval('#u-password', (el) => { el.value = ''; });
+  await page.type('#u-password', 'correct horse');
+  await page.click('#unlock button[type=submit]');
+  await page.waitForFunction(() => /locked@x\.com/.test(document.querySelector('#vault').textContent)
+    && /a@b\.com/.test(document.querySelector('#vault').textContent), { timeout: 20000 });
+  assert.ok(!JSON.stringify(await storage()).includes('locked-pw'));
 });
 
 await browser.close();

@@ -1,2 +1,13 @@
 node_modules/
 .DS_Store
+passwords.csv
+*.csv
+!playground/*.csv
+research/all-sites.json
+research/full/
+research/full-run.log
+research/rest-sites.json
+research/scan.log
+research/rest-run.log
+research/email-step-sites.json
+research/email-step/

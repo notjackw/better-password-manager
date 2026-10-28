@@ -3,8 +3,8 @@
 A password manager focused on one thing: **recognizing when you log in, sign up or reset a password,
 and getting those credentials into the vault every time.**
 
-> Security is intentionally out of scope for now. The vault is stored **unencrypted** in
-> `chrome.storage.local`. Don't use it for accounts you care about until encryption is added.
+> Set a **master password** (popup footer) to encrypt your saved logins. Without one they're stored
+> unencrypted. This is a hobby project, not an audited password manager.
 
 ## Why built-in password managers miss some logins
 
@@ -141,7 +141,15 @@ Nothing that was typed and submitted is thrown away. Anything that isn't confirm
 Everything is stored in `chrome.storage.local`, under the keys `vault` (saved logins) and `review` (Needs review):
 - **Local only:** it stays on this computer and is never synced or sent anywhere.
 - **Private to the extension:** websites and other extensions can't read it.
-- **Not encrypted:** it's a file in your Chrome profile folder, readable by anyone with access to your user account.
+- **Encrypted once you set a master password** (`src/shared/vault-crypto.js`):
+  - Your master password is turned into a key with PBKDF2-SHA256 (600,000 rounds, random salt), and the
+    vault is encrypted with AES-256-GCM. The master password itself is never stored.
+  - While unlocked, the key is kept only in `chrome.storage.session`: in memory, never written to disk,
+    and erased when Chrome quits. Web pages and the extension's own page scripts can't read it.
+  - **Lock** in the popup forgets the key right away. Forgetting the master password means the vault can't be recovered.
+  - Logins you make while locked are held in memory and saved the next time you unlock. A toast tells you
+    when that happens, and the toolbar badge counts them.
+- **Without a master password it's not encrypted:** it's a file in your Chrome profile folder, readable by anyone with access to your user account.
 - **Removed with the extension:** uninstalling it deletes the vault.
 
 To look at it yourself: `chrome://extensions` → this extension → *service worker* → console →

@@ -38,6 +38,9 @@ h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing
 .row { display: flex; justify-content: space-between; align-items: baseline; }
 .actions { display: flex; gap: 8px; }
 .muted { color: var(--muted); }
+.error-text { color: #dc2626; margin: 0 0 8px; }
+.warn-text { color: var(--warn, #b45309); margin: 0 0 8px; }
+footer { flex-wrap: wrap; }
 .status { margin: 8px 0 0; color: var(--muted); }
 
 button {
@@ -76,7 +79,7 @@ label input { margin-top: 3px; color: var(--fg); }
 .entry-status { color: var(--warn); font-size: 12px; margin-top: 2px; }
 .entry-buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 
-#activity-section { margin-top: 12px; }
+#activity-section { padding: 0 14px 12px; }
 #activity-section summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .activity { list-style: none; margin: 8px 0 0; padding: 0; max-height: 180px; overflow-y: auto; font-size: 12px; }
 .activity li { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }

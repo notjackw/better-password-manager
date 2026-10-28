@@ -33,7 +33,8 @@
 
   PM.isVisible = (el) => {
     if (!el.isConnected || el.type === 'hidden') return false;
-    if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+    // Opacity doesn't count: some sites (Airbnb) keep a field transparent until it's focused.
+    if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) return false;
     const r = el.getBoundingClientRect();
     return r.width > 1 && r.height > 1;
   };
@@ -71,6 +72,9 @@
   function passwordKind(el) {
     const ac = acTokens(el);
     const sig = signals(el);
+    // An explicit current-password beats the field's name: TurboTax's login box is id="…password-confirmation…".
+    // (new-password isn't trusted the same way; sites put it on login forms to block autofill.)
+    if (ac.includes('current-password') && !RE.newPw.test(sig)) return { kind: 'current', fromAutocomplete: true };
     if (RE.confirmPw.test(sig)) return { kind: 'confirm', fromAutocomplete: false };
     if (RE.currentPw.test(sig)) return { kind: 'current', fromAutocomplete: false };
     if (RE.newPw.test(sig)) return { kind: 'new', fromAutocomplete: false };

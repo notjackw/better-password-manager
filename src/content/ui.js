@@ -62,7 +62,7 @@
     return layer;
   };
 
-  PM.showToast = ({ text, actionLabel, onAction }) => {
+  PM.showToast = ({ text, actionLabel, onAction, duration = 8000 }) => {
     const s = root();
     s.querySelector('.toast')?.remove();
     const toast = document.createElement('div');
@@ -86,7 +86,7 @@
     close.addEventListener('click', () => toast.remove());
     toast.append(close);
     s.append(toast);
-    setTimeout(() => toast.remove(), 8000);
+    setTimeout(() => toast.remove(), duration);
   };
 
   function placeMenu() {

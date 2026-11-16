@@ -123,6 +123,40 @@ After editing code, click the reload icon on the extension card, then reload the
 Nothing that was typed and submitted is thrown away. Anything that isn't confirmed waits in
 **Needs review** in the popup. A badge on the toolbar icon shows how many items are waiting.
 
+## Payment cards
+
+`src/content/cards.js` recognizes card forms: number, expiry (one box, or month/year dropdowns), name on
+card, billing ZIP and CVC. It uses `autocomplete="cc-*"` when a site sets it, and labels and names
+("Card number", "Security code") when it doesn't. Payment processors often put each card field in its own
+iframe on another domain, so every frame reports its card fields to the background, which combines them
+per tab into one card.
+
+- **Saving:** when you press a pay/continue button with a valid card number (Luhn check) and expiry,
+  a toast asks *Save Visa •••• 4242 to Password Manager?* The card is stored only if you click **Save card**.
+  It's encrypted and synced with your logins. A saved card with a new expiry is updated.
+- **The CVC is never read or saved.** After filling, the cursor is left in the CVC box.
+- **Filling:** focus a card field and pick a saved card. If the field is in a small processor iframe, the
+  page draws the menu below that iframe. The card goes to the page, frames on the page's own site, the
+  frame you picked from, and known payment processors (list in `cards.js`). Other embedded frames, like
+  ads, never receive it.
+- Cards can also be added, edited and deleted under **Cards** in the popup.
+
+## Addresses (checkout autofill)
+
+`src/content/profiles.js` recognizes name, email, phone and postal-address fields: one full-name box or
+first/last boxes, address lines, city, state, ZIP and country, as text boxes or dropdowns. It uses
+`autocomplete` (including `shipping …`/`billing …`) when present, and labels otherwise. A form needs at
+least two kinds of fields (name + email, say), so a lone newsletter or login email box never counts.
+Footers and one-box forms are skipped.
+
+- **Address iframes:** checkouts like secondwave.fahertybrand.com put the address inside Stripe's
+  address iframe. Each frame reports its own fields and the background combines them, same as cards.
+- **Saving:** pressing Continue/Pay with a name or email plus an address shows *Save 1 Main St to
+  Password Manager?* A new address for a profile you already have just fills in its blanks.
+- **Filling:** focus a name or address field and pick a profile. Text boxes that already have something in
+  them are never overwritten; the country is set first because changing it often redraws the state field.
+- Add, edit and delete them under **Addresses** in the popup. They're encrypted and synced with everything else.
+
 ## Using it
 
 - **Autofill menu**: focus a username or password field to pick a saved login. On signup/reset fields
@@ -139,9 +173,10 @@ Nothing that was typed and submitted is thrown away. Anything that isn't confirm
 ### Where the data lives
 
 Everything is stored in `chrome.storage.local`, under the keys `vault` (saved logins) and `review` (Needs review):
-- **Local only:** it stays on this computer and is never synced or sent anywhere.
+- **Account first:** nothing is saved until you sign in to (or create) an account in the popup (see Sync below).
+  Logins you make before that are held in memory and saved when you sign in.
 - **Private to the extension:** websites and other extensions can't read it.
-- **Encrypted once you set a master password** (`src/shared/vault-crypto.js`):
+- **Always encrypted with your account's master password** (`src/shared/vault-crypto.js`):
   - Your master password is turned into a key with PBKDF2-SHA256 (600,000 rounds, random salt), and the
     vault is encrypted with AES-256-GCM. The master password itself is never stored.
   - While unlocked, the key is kept only in `chrome.storage.session`: in memory, never written to disk,
@@ -149,8 +184,32 @@ Everything is stored in `chrome.storage.local`, under the keys `vault` (saved lo
   - **Lock** in the popup forgets the key right away. Forgetting the master password means the vault can't be recovered.
   - Logins you make while locked are held in memory and saved the next time you unlock. A toast tells you
     when that happens, and the toolbar badge counts them.
-- **Without a master password it's not encrypted:** it's a file in your Chrome profile folder, readable by anyone with access to your user account.
 - **Removed with the extension:** uninstalling it deletes the vault.
+
+### Sync across computers
+
+`server/` is a small sync server (Node + Express + SQLite). Run it with `cd server && npm install && npm start`
+(serves `http://localhost:8787`). Signed out, the popup offers **Sign in** or **Create account**; the server
+address is under *Server* at the bottom.
+- **Create account** picks a username and master password. That master password is what unlocks the
+  extension from then on.
+- **Sign in** tells you exactly what went wrong: no account with that name, wrong master password, or the
+  server can't be reached.
+- The lock screen has **Use a different account**, which signs out without unlocking (for a forgotten password).
+- Use the same username and master password on your other computers.
+- **Account → Sign out** uploads any last changes, then removes the logins from this computer. They stay in
+  the account.
+
+The server is zero-knowledge. From the master password the extension derives two things: the vault key,
+which never leaves the computer, and a login hash (`PM.loginHash`), which is all the server sees. The
+vault is uploaded already encrypted.
+
+You only sign in once per computer. After that, unlocking with your master password is the only login: if
+the server session ever ends, the extension signs back in by itself. Every change is pushed about 1.5s after
+it's saved. The server tells every other open computer over a WebSocket (`/events`), and they pull it right
+away. A once-a-minute check backs this up in case the connection drops.
+Each login merges separately (newest edit wins), and deletions are remembered so they sync too
+(`src/shared/sync-merge.js`).
 
 To look at it yourself: `chrome://extensions` → this extension → *service worker* → console →
 `await chrome.storage.local.get(null)`.
@@ -163,6 +222,8 @@ To look at it yourself: `chrome://extensions` → this extension → *service wo
 npm install
 npm test        # detection heuristics against HTML fixtures (jsdom)
 npm run e2e     # loads the extension into Chrome and walks through playground/
+npm run e2e:sync  # two Chromes plus the sync server: logins and deletions sync both ways
+cd server && npm test  # sync server API
 ```
 
 `playground/` has practice pages for each flow (form login, single-page app, two-step, signup, reset).

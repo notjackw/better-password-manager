@@ -119,7 +119,16 @@ test('first step of a two-step login (email, then Next)', () => {
 test('forgot-password email form is not mistaken for a login step', () => {
   const w = page(`<h1>Forgot your password?</h1><form><input id="e" type="email"><button>Send reset link</button></form>`,
     'https://example.com/forgot');
-  assert.equal(group(w, '#e').kind, null);
+  assert.equal(group(w, '#e').kind, 'reset-identify');
+});
+
+test('forgot-password form asking for a username (MyChart style) names the account to reset', () => {
+  const w = page(`<h1>Password Reset</h1><form>
+      <label for="u">MyChart username</label><input id="u" name="Username">
+      <button>Next</button></form>`, 'https://patientgateway.example.org/MyChart/PasswordReset');
+  const g = group(w, '#u', { values: { '#u': 'jackw' } });
+  assert.equal(g.kind, 'reset-identify');
+  assert.equal(g.username.id, 'u');
 });
 
 test('newsletter email box elsewhere on a formless page is not picked as the username', () => {

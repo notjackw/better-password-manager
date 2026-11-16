@@ -26,3 +26,10 @@ test('wrong master password fails to decrypt', async () => {
   const blob = await PM.encryptJson(await PM.deriveKey('right', kdf), [1, 2, 3]);
   await assert.rejects(PM.decryptJson(await PM.deriveKey('wrong', kdf), blob));
 });
+
+test('a large vault (thousands of logins) encrypts without overflowing the stack', async () => {
+  const key = await PM.deriveKey('master pw', fast(PM.newKdfParams()));
+  const vault = Array.from({ length: 5000 }, (_, i) => ({ site: `site${i}.com`, username: `user${i}@example.com`, password: `pw-${i}-xxxxxxxxxxxx` }));
+  const blob = await PM.encryptJson(key, vault);
+  assert.equal((await PM.decryptJson(key, blob)).length, 5000);
+});

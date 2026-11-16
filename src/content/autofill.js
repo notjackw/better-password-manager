@@ -1,8 +1,44 @@
-// Offers saved logins when a login field is focused, and a generated password on signup/reset/change forms.
+// Offers saved logins when a login field is focused, a generated password on signup/reset/change forms,
+// saved cards on card fields (cards.js) and saved profiles on name/address fields (profiles.js).
 (() => {
   const PM = (globalThis.PM ||= {});
 
   let focusToken = null;
+  let menuInTop = false; // this (small) frame's menu is being drawn by the top page
+
+  // Processor iframes are often one field tall, too small to draw a menu in. Those ask the top page
+  // (via the background) to draw it just below the iframe instead.
+  const tooSmallForMenu = () => window !== top && innerHeight < 200;
+  const menuItems = { card: (o) => PM.cardMenuItems(o), profile: (o) => PM.profileMenuItems(o) };
+
+  // Shows the menu in a field of this frame, or asks the top page to if this frame is too small.
+  async function showFieldMenu(el, kind) {
+    if (tooSmallForMenu()) {
+      menuInTop = true;
+      PM.send({ type: 'FRAME_MENU', show: true, kind, frameUrl: location.href });
+      return;
+    }
+    const token = (focusToken = {});
+    const items = await menuItems[kind]();
+    if (token === focusToken && items.length) PM.showMenu(el, items);
+  }
+
+  PM.showFrameMenu = async (kind, frameUrl) => {
+    const same = (src) => {
+      try {
+        const a = new URL(src, location.href);
+        const b = new URL(frameUrl);
+        return a.href === b.href || (a.origin === b.origin && a.pathname === b.pathname);
+      } catch {
+        return false;
+      }
+    };
+    const iframe = PM.deepQueryAll(document, 'iframe').find((f) => f.src && same(f.src));
+    if (!iframe) return;
+    const token = (focusToken = {});
+    const items = await menuItems[kind]({ frameUrl });
+    if (token === focusToken && items.length) PM.showMenu(iframe, items);
+  };
 
   // Sets a value the way typing would, so React/Vue/Angular state picks it up.
   PM.setFieldValue = (el, value) => {
@@ -74,6 +110,10 @@
 
   document.addEventListener('focusin', async (e) => {
     const el = e.composedPath()[0];
+    if (PM.fillingProfile) return;
+    const cardRole = PM.cardRole(el);
+    if (cardRole && cardRole !== 'csc' && cardRole !== 'zip') return showFieldMenu(el, 'card');
+    if (PM.profileRole(el)) return showFieldMenu(el, 'profile');
     const role = PM.classifyField(el)?.role;
     if (role !== 'username' && role !== 'password') return;
     const token = (focusToken = {});
@@ -94,7 +134,14 @@
     if (token === focusToken && items.length) PM.showMenu(el, items);
   }, true);
 
+  const hideTopMenu = () => {
+    if (!menuInTop) return;
+    menuInTop = false;
+    PM.send({ type: 'FRAME_MENU', show: false });
+  };
+
   document.addEventListener('focusout', () => {
+    hideTopMenu();
     focusToken = null;
     setTimeout(() => {
       if (!focusToken) PM.hideMenu();
@@ -109,6 +156,7 @@
   // submit button. Our own fills dispatch untrusted events, so they don't count.
   document.addEventListener('input', (e) => {
     if (!e.isTrusted) return;
+    hideTopMenu();
     focusToken = null;
     PM.hideMenu();
   }, true);

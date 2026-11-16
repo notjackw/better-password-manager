@@ -20,11 +20,15 @@
       "run_at": "document_start",
       "js": [
         "src/shared/domain.js",
+        "src/shared/cards.js",
+        "src/shared/profiles.js",
         "src/content/fields.js",
         "src/content/forms.js",
         "src/content/outcome.js",
         "src/content/ui.js",
         "src/content/capture.js",
+        "src/content/cards.js",
+        "src/content/profiles.js",
         "src/content/autofill.js",
         "src/content/debug.js",
         "src/content/main.js"

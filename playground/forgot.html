@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Forgot password</title><link rel="stylesheet" href="style.css">
+<h1>Forgot your password?</h1>
+<p>Enter your username and we'll email you a code.</p>
+<form id="f">
+  <label for="u">Username</label>
+  <input id="u" name="username">
+  <button>Send code</button>
+</form>
+<script>
+  document.querySelector('#f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    location.href = 'reset.html';
+  });
+</script>

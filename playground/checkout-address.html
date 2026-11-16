@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><title>Checkout - Second Wave</title><link rel="stylesheet" href="style.css">
+<!-- Mirrors secondwave.fahertybrand.com/checkout: a one-box full name, an email, the address inside a
+     payment processor's iframe (mirrored into hidden inputs), and a newsletter box in the footer. -->
+<h1>Checkout</h1>
+<p><a href="login.html">Log in</a> for a faster checkout or <a href="signup.html">create an account</a>.</p>
+<form id="checkout">
+  <h3>Contact</h3>
+  <label for="name-input">Full Name (first and last)</label>
+  <input id="name-input" name="name" type="text" aria-label="Full Name (first and last)">
+  <label for="email-input">Email</label>
+  <input id="email-input" name="email" type="text" aria-label="Email">
+  <label><input type="checkbox" name="newsletter_opt_in" checked> Be the first to know about updates</label>
+  <h3>Shipping address</h3>
+  <iframe id="address" src="address-frame.html" style="width:100%;height:330px;border:0"></iframe>
+  <input type="hidden" name="address_line_1"><input type="hidden" name="locality">
+  <input type="hidden" name="administrative_area"><input type="hidden" name="postal_code"><input type="hidden" name="country">
+  <button id="continue" type="button">Continue to payment</button>
+</form>
+<p id="msg"></p>
+<footer>
+  <h3>Stay in Touch</h3>
+  <form id="newsletter"><input id="newsletterSignupEmailInput" name="email" placeholder="Email address" aria-label="Email"><button>Sign up</button></form>
+</footer>
+<script>
+  document.querySelector('#continue').addEventListener('click', () => { document.querySelector('#msg').textContent = 'On to payment.'; });
+  document.querySelector('#newsletter').addEventListener('submit', (e) => e.preventDefault());
+</script>

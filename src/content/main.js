@@ -33,16 +33,30 @@
       case 'TOAST':
         if (window === top) showToast(msg);
         return false;
+      case 'FILL_CARD_FIELDS':
+        if (PM.mayFillFrame(msg.frameUrl)) PM.fillCard(msg.card);
+        return false;
+      case 'FILL_PROFILE_FIELDS':
+        if (PM.mayFillFrame(msg.frameUrl)) PM.fillProfile(msg.profile);
+        return false;
+      case 'FRAME_MENU':
+        if (window !== top) return false;
+        if (msg.show) PM.showFrameMenu(msg.kind, msg.frameUrl);
+        else PM.hideMenu();
+        return false;
       default:
         return false;
     }
   });
 
+  // msg.action is { label, message }: what the toast's button sends to the background.
   function showToast(msg) {
+    const action = msg.action || (msg.undo && { label: 'Undo', message: { type: 'UNDO', undo: msg.undo } });
     PM.showToast({
       text: msg.text,
-      actionLabel: msg.undo ? 'Undo' : '',
-      onAction: () => PM.send({ type: 'UNDO', undo: msg.undo }),
+      actionLabel: action?.label || '',
+      onAction: () => PM.send(action.message),
+      duration: msg.duration,
     });
   }
 

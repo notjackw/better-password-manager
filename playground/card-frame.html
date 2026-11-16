@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>card field</title>
+<style>body { margin: 0; } input { width: 100%; box-sizing: border-box; font: 16px system-ui; padding: 8px; }</style>
+<input id="f">
+<script>
+  // One field per frame, the way payment processors (Stripe Elements and others) isolate card data.
+  const field = new URLSearchParams(location.search).get('field');
+  const input = document.querySelector('#f');
+  const attrs = {
+    number: { name: 'cardnumber', placeholder: 'Card number', inputmode: 'numeric' },
+    exp: { name: 'exp-date', placeholder: 'MM / YY' },
+    cvc: { name: 'cvc', placeholder: 'CVC' },
+  }[field];
+  for (const [k, v] of Object.entries(attrs)) input.setAttribute(k, v);
+</script>

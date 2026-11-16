@@ -1,0 +1,13 @@
+{
+  "name": "password-manager-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "ws": "^8.22.1"
+  }
+}

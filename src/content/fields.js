@@ -39,9 +39,9 @@
     return r.width > 1 && r.height > 1;
   };
 
-  const acTokens = (el) => (el.getAttribute('autocomplete') || '').toLowerCase().split(/\s+/);
+  const acTokens = PM.acTokens = (el) => (el.getAttribute('autocomplete') || '').toLowerCase().split(/\s+/);
 
-  function labelText(el) {
+  const labelText = PM.labelText = (el) => {
     const parts = [];
     if (el.labels) for (const l of el.labels) parts.push(l.textContent);
     const ids = el.getAttribute('aria-labelledby');
@@ -50,8 +50,9 @@
       for (const id of ids.split(/\s+/)) parts.push(root.getElementById?.(id)?.textContent);
     }
     return parts.join(' ');
-  }
+  };
 
+  PM.fieldSignals = signals;
   function signals(el) {
     const attrs = ['name', 'id', 'placeholder', 'aria-label', 'title', 'data-testid', 'data-test', 'data-qa'];
     return PM.norm([...attrs.map((a) => el.getAttribute(a)), labelText(el)].join(' '));

@@ -23,6 +23,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   width: 360px;
   margin: 0;
@@ -84,3 +85,15 @@ label input { margin-top: 3px; color: var(--fg); }
 .activity { list-style: none; margin: 8px 0 0; padding: 0; max-height: 180px; overflow-y: auto; font-size: 12px; }
 .activity li { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .activity time { color: var(--muted); }
+
+h1 { margin: 4px 0 6px; font-size: 18px; }
+.stack { display: grid; gap: 8px; margin-top: 14px; }
+.stack button { padding: 9px 10px; }
+.switch { margin: 10px 0 0; color: var(--muted); }
+.hint { margin: -4px 0 8px; font-size: 12px; color: var(--muted); }
+#server-box { padding: 0 14px 12px; color: var(--muted); font-size: 12px; }
+#server-box summary { cursor: pointer; }
+#server-box label { margin-top: 6px; }
+.reloading { padding: 16px 14px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.profile-lines { white-space: pre-line; }

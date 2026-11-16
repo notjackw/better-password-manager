@@ -5,7 +5,13 @@
   const subtle = globalThis.crypto.subtle;
   const ITERATIONS = 600000; // OWASP's 2023 recommendation for PBKDF2-SHA256
 
-  const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  // In chunks: spreading a whole large vault into fromCharCode overflows the call stack.
+  const toB64 = (buf) => {
+    const bytes = new Uint8Array(buf);
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
   const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
   PM.newKdfParams = () => ({ salt: toB64(crypto.getRandomValues(new Uint8Array(16))), iterations: ITERATIONS });
@@ -19,6 +25,15 @@
       true, // exportable, so the unlocked key can be kept in memory-only session storage
       ['encrypt', 'decrypt'],
     );
+  };
+
+  // What the sync server gets instead of the master password: one more PBKDF2 round over the vault key,
+  // salted with the password. It proves we know the password, but can't be turned back into the key.
+  PM.loginHash = async (key, password) => {
+    const base = await subtle.importKey('raw', await subtle.exportKey('raw', key), 'PBKDF2', false, ['deriveBits']);
+    const bits = await subtle.deriveBits(
+      { name: 'PBKDF2', salt: new TextEncoder().encode(password), iterations: 1, hash: 'SHA-256' }, base, 256);
+    return toB64(bits);
   };
 
   PM.exportKey = (key) => subtle.exportKey('jwk', key);

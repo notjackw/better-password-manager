@@ -1,5 +1,6 @@
 // Groups fields into a "login unit" (a <form>, or the nearest container on formless pages) and decides
-// what that unit is for: login, signup, reset, change, or step one of a multi-step login.
+// what that unit is for: login, signup, reset, change, step one of a multi-step login, or the
+// "forgot password" form where you say which account to reset (reset-identify).
 (() => {
   const PM = (globalThis.PM ||= {});
 
@@ -33,7 +34,7 @@
     return p?.nodeType === 1 ? p : null;
   };
 
-  const buttonLabel = (b) => PM.norm([
+  const buttonLabel = PM.buttonLabel = (b) => PM.norm([
     b.textContent,
     b.tagName === 'INPUT' ? b.value : '',
     b.getAttribute('aria-label'),
@@ -174,6 +175,7 @@
     else if (slots.current) kind = 'login';
     else if (otp) kind = 'otp';
     else if (user && ctx.reset === 0 && (ctx.login > 0 || user.acUser)) kind = 'username-step';
+    else if (user && ctx.reset > 0) kind = 'reset-identify';
 
     return {
       root,

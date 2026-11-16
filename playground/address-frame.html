@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>address</title>
+<style>body { margin: 0; font: 14px system-ui; } label { display: block; margin: 6px 0 2px; } input, select { width: 100%; box-sizing: border-box; padding: 6px; }</style>
+<!-- Like Stripe's Address Element: its own frame, country and state as dropdowns. -->
+<label for="country">Country or region</label>
+<select id="country" name="country" autocomplete="shipping country">
+  <option value="CA">Canada</option><option value="US" selected>United States</option><option value="GB">United Kingdom</option>
+</select>
+<label for="line1">Address</label><input id="line1" name="addressLine1" autocomplete="shipping address-line1">
+<label for="line2">Apartment, suite, etc.</label><input id="line2" name="addressLine2" autocomplete="shipping address-line2">
+<label for="city">City</label><input id="city" name="locality" autocomplete="shipping address-level2">
+<label for="state">State</label>
+<select id="state" name="administrativeArea" autocomplete="shipping address-level1">
+  <option value="">Select</option><option value="CA">California</option><option value="MA">Massachusetts</option><option value="NY">New York</option>
+</select>
+<label for="zip">ZIP</label><input id="zip" name="postalCode" autocomplete="shipping postal-code">

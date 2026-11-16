@@ -56,9 +56,10 @@
   function attempt(root, trigger) {
     if (!root) return;
     const g = PM.analyzeGroup(root, { withValues: true });
-    if (g.kind === 'username-step') {
+    if (g.kind === 'username-step' || g.kind === 'reset-identify') {
       const username = PM.fieldValue(g.username).trim();
-      if (username) PM.send({ type: 'STEP_USERNAME', username, site: PM.siteKey(location.hostname) });
+      const forReset = g.kind === 'reset-identify';
+      if (username) PM.send({ type: 'STEP_USERNAME', username, forReset, site: PM.siteKey(location.hostname) });
       return;
     }
     if (!['login', 'signup', 'reset', 'change'].includes(g.kind)) return;

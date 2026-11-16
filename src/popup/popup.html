@@ -17,24 +17,59 @@
 
   <form id="unlock" hidden>
     <h2>Locked</h2>
-    <p class="muted">Enter your master password to see and fill your logins.</p>
+    <p class="muted">Signed in as <strong id="unlock-user"></strong>. Enter your master password to see and fill your logins.</p>
     <label>Master password <input id="u-password" type="password" required autocomplete="current-password"></label>
     <p class="error-text" id="unlock-error" hidden></p>
     <div class="actions"><button type="submit" class="primary">Unlock</button></div>
+    <p class="switch"><button type="button" class="link" id="unlock-switch">Use a different account</button></p>
   </form>
 
-  <form id="master" hidden>
-    <h2>Set a master password</h2>
-    <p class="muted">Your saved logins will be stored encrypted. You'll enter this password once each time Chrome starts.</p>
-    <label>Master password <input id="m-password" type="password" required minlength="8" autocomplete="new-password"></label>
-    <label>Type it again <input id="m-confirm" type="password" required autocomplete="new-password"></label>
-    <p class="warn-text">If you forget it, your saved logins can't be recovered.</p>
-    <p class="error-text" id="master-error" hidden></p>
-    <div class="actions">
-      <button type="submit" class="primary">Encrypt my logins</button>
-      <button type="button" id="master-cancel">Cancel</button>
+  <section id="welcome" hidden>
+    <h1>Password Manager</h1>
+    <p class="muted">Your logins are saved to your account, encrypted with your master password. The server never sees it.</p>
+    <div class="stack">
+      <button type="button" class="primary" data-go="signin">Sign in</button>
+      <button type="button" data-go="signup">Create account</button>
     </div>
+  </section>
+
+  <form id="signin" hidden>
+    <h2>Sign in</h2>
+    <label>Username <input id="in-username" required autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+    <label>Master password <input id="in-password" type="password" required autocomplete="current-password"></label>
+    <p class="error-text" id="signin-error" hidden></p>
+    <div class="actions"><button type="submit" class="primary">Sign in</button></div>
+    <p class="switch">No account? <button type="button" class="link" data-go="signup">Create one</button></p>
   </form>
+
+  <form id="signup" hidden>
+    <h2>Create account</h2>
+    <label>Username <input id="up-username" required minlength="3" maxlength="64" pattern="[A-Za-z0-9._\-]+" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+    <p class="hint">Letters, numbers, dots, dashes and underscores.</p>
+    <label>Master password <input id="up-password" type="password" required minlength="8" autocomplete="new-password"></label>
+    <label>Type it again <input id="up-confirm" type="password" required autocomplete="new-password"></label>
+    <p class="warn-text">This is the only password you'll need to remember. If you forget it, your logins can't be recovered.</p>
+    <p class="error-text" id="signup-error" hidden></p>
+    <div class="actions"><button type="submit" class="primary">Create account</button></div>
+    <p class="switch">Have an account? <button type="button" class="link" data-go="signin">Sign in</button></p>
+  </form>
+
+  <details id="server-box" hidden>
+    <summary>Server: <span id="server-label"></span></summary>
+    <label>Server address <input id="server" value="http://localhost:8787" spellcheck="false"></label>
+  </details>
+
+  <section id="account" hidden>
+    <h2>Account</h2>
+    <p>Signed in as <strong id="acct-user"></strong> on <span id="acct-server"></span>.</p>
+    <p class="muted" id="acct-last"></p>
+    <p class="error-text" id="acct-error" hidden></p>
+    <div class="actions">
+      <button type="button" id="sync-now" class="primary">Sync now</button>
+      <button type="button" id="sign-out">Sign out</button>
+      <button type="button" data-go="lists">Back</button>
+    </div>
+  </section>
 
   <main id="lists">
     <section id="review-section" hidden>
@@ -49,6 +84,22 @@
       <input id="search" type="search" placeholder="Search sites and usernames">
       <ul id="vault" class="list"></ul>
       <p id="empty" class="muted" hidden>Nothing saved yet. Sign in somewhere and it will show up here.</p>
+    </section>
+    <section id="cards-section">
+      <div class="row">
+        <h2>Cards</h2>
+        <button id="add-card" class="link">+ Add</button>
+      </div>
+      <ul id="cards" class="list"></ul>
+      <p id="cards-empty" class="muted" hidden>No cards yet. Pay with a card somewhere and you'll be asked to save it.</p>
+    </section>
+    <section id="profiles-section">
+      <div class="row">
+        <h2>Addresses</h2>
+        <button id="add-profile" class="link">+ Add</button>
+      </div>
+      <ul id="profiles" class="list"></ul>
+      <p id="profiles-empty" class="muted" hidden>No addresses yet. Check out somewhere and you'll be asked to save it, or add one.</p>
     </section>
     <details id="activity-section">
       <summary>Recent activity</summary>
@@ -68,14 +119,51 @@
     </div>
   </form>
 
+  <form id="card-editor" hidden>
+    <h2 id="card-editor-title">Add card</h2>
+    <label>Card number <input id="c-number" required inputmode="numeric" autocomplete="off"></label>
+    <label>Expiry (MM/YY) <input id="c-exp" required placeholder="MM/YY" autocomplete="off"></label>
+    <label>Name on card <input id="c-name" autocomplete="off"></label>
+    <label>Billing ZIP <input id="c-zip" autocomplete="off"></label>
+    <p class="error-text" id="card-error" hidden></p>
+    <div class="actions">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" data-go="lists">Cancel</button>
+    </div>
+  </form>
+
+  <form id="profile-editor" hidden>
+    <h2 id="profile-editor-title">Add address</h2>
+    <label>Full name <input id="pf-name" autocomplete="off"></label>
+    <label>Email <input id="pf-email" type="email" autocomplete="off"></label>
+    <label>Phone <input id="pf-phone" type="tel" autocomplete="off"></label>
+    <label>Address <input id="pf-address1" autocomplete="off"></label>
+    <label>Apt, suite, etc. <input id="pf-address2" autocomplete="off"></label>
+    <div class="cols">
+      <label>City <input id="pf-city" autocomplete="off"></label>
+      <label>State <input id="pf-state" autocomplete="off" placeholder="MA"></label>
+    </div>
+    <div class="cols">
+      <label>ZIP <input id="pf-zip" autocomplete="off"></label>
+      <label>Country <input id="pf-country" autocomplete="off" value="US"></label>
+    </div>
+    <p class="error-text" id="profile-error" hidden></p>
+    <div class="actions">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" data-go="lists">Cancel</button>
+    </div>
+  </form>
+
   <footer>
     <button id="debug" class="link">Highlight detected fields</button>
     <button id="import" class="link">Import passwords (CSV)</button>
+    <button id="open-sync" class="link">Account</button>
     <button id="lock" class="link" hidden>Lock</button>
-    <button id="set-master" class="link" hidden>Set master password</button>
   </footer>
 
   <script src="../shared/domain.js"></script>
+  <script src="../shared/cards.js"></script>
+  <script src="../shared/profiles.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

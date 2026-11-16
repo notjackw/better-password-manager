@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "e2e": "node scripts/e2e.mjs"
+    "e2e": "node scripts/e2e.mjs",
+    "e2e:sync": "node --disable-warning=ExperimentalWarning scripts/sync-e2e.mjs"
   },
   "devDependencies": {
     "jsdom": "^25.0.1",

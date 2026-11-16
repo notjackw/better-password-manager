@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Checkout</title><link rel="stylesheet" href="style.css">
+<h1>Checkout</h1>
+<p>Card fields are in separate iframes, like a payment processor's.</p>
+<label for="nm">Name on card</label><input id="nm" autocomplete="cc-name">
+<iframe id="number" src="card-frame.html?field=number" style="height:44px;width:100%;border:1px solid #ccc"></iframe>
+<iframe id="exp" src="card-frame.html?field=exp" style="height:44px;width:48%;border:1px solid #ccc"></iframe>
+<iframe id="cvc" src="card-frame.html?field=cvc" style="height:44px;width:48%;border:1px solid #ccc"></iframe>
+<button id="pay" type="button">Pay $25.00</button>
+<div id="msg"></div>
+<script>
+  document.querySelector('#pay').addEventListener('click', () => {
+    setTimeout(() => { document.querySelector('#msg').textContent = 'Payment received.'; }, 300);
+  });
+</script>

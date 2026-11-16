@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>Pay your bill</title><link rel="stylesheet" href="style.css">
+<h1>Make a payment</h1>
+<form id="f">
+  <label for="amt">Amount</label><input id="amt" name="Amount" value="25.00">
+  <label for="nm">Name on card</label><input id="nm" name="NameOnCard">
+  <label for="cn">Card number</label><input id="cn" name="CardNumber" inputmode="numeric">
+  <label for="mo">Expiration date</label>
+  <select id="mo" name="ExpMonth"><option value="">Month</option>
+    <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option>
+    <option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option>
+    <option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+  </select>
+  <select id="yr" name="ExpYear" aria-label="Expiration year"><option value="">Year</option>
+    <option>2026</option><option>2027</option><option>2028</option><option>2029</option><option>2030</option>
+  </select>
+  <label for="cv">Security code</label><input id="cv" name="Cvv" maxlength="4">
+  <label for="zp">Billing ZIP code</label><input id="zp" name="BillingZip">
+  <button>Continue</button>
+</form>
+<script>
+  document.querySelector('#f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    setTimeout(() => { location.href = 'welcome.html'; }, 300);
+  });
+</script>

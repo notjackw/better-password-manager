@@ -43,15 +43,18 @@
     if (ac.some((t) => t.startsWith('cc-'))) return null;
     for (const t of ac) if (AC[t]) return AC[t];
     const sig = PM.fieldSignals(el);
-    if (!sig || RE.skip.test(sig)) return null;
-    if (el.type === 'email') return 'email';
-    if (el.type === 'tel') return 'tel';
+    if (!sig) return null;
     // What the user sees decides first, then the field's name, then test ids and other hints: Faherty
-    // tags every field data-testid="AddressForm-…", which would make them all look like address lines.
+    // tags every field data-testid="AddressForm-…", which would make them all look like address lines,
+    // and OpenWeb's "Name" box is name="username" behind the scenes.
     const sources = [PM.labelText(el) + ' ' + (el.getAttribute('aria-label') || ''), `${el.name} ${el.id}`, sig];
     for (const s of sources) {
       const t = PM.norm(s);
-      const role = t && ORDER.find((r) => RE[r].test(t));
+      if (!t) continue;
+      if (RE.skip.test(t)) return null;
+      if (el.type === 'email') return 'email';
+      if (el.type === 'tel') return 'tel';
+      const role = ORDER.find((r) => RE[r].test(t));
       if (role) return role;
     }
     return null;

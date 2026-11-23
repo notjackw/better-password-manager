@@ -110,3 +110,12 @@ test('a Material UI state dropdown is filled by opening it and clicking the opti
   const v = (id) => d.getElementById(id).value;
   assert.deepEqual(['name-input', 'a1', 'city', 'st', 'zip', 'email-input'].map(v), ['Jack Williams', '1 Main St', 'Boston', 'MA', '02114', 'j@x.com']);
 });
+
+test('OpenWeb sign-up (Lifehacker comments): a "Name" box named username still counts as a name', () => {
+  const w = page(`<form>
+    <label for="name">Name</label><input id="name" data-testid="username">
+    <label for="email-address">Email Address</label><input id="email-address" type="email">
+    <label for="password">Password</label><input id="password" type="password">
+    <button>Create Account</button></form>`, 'https://lifehacker.com/tech/x');
+  assert.deepEqual(roles(w), ['name:name', 'email:email-address']);
+});

@@ -21,6 +21,7 @@
     const token = (focusToken = {});
     const items = await menuItems[kind]();
     if (token === focusToken && items.length) PM.showMenu(el, items);
+    return items.length > 0;
   }
 
   PM.showFrameMenu = async (kind, frameUrl) => {
@@ -108,14 +109,27 @@
     };
   }
 
+  // Opens the menu for a field when it gains focus (trying again a moment later), or when it's clicked
+  // while already focused: sign-up popups (Lifehacker's OpenWeb box) focus their first field before the
+  // rest of the form is drawn, so at focus time it doesn't look like a form yet.
   document.addEventListener('focusin', async (e) => {
     const el = e.composedPath()[0];
+    if (await offerMenu(el) || el.tagName !== 'INPUT' || el.value) return;
+    await new Promise((r) => setTimeout(r, 600));
+    if (!PM.menuShown() && !el.value && el.getRootNode().activeElement === el) offerMenu(el);
+  }, true);
+  document.addEventListener('click', (e) => {
+    const el = e.composedPath()[0];
+    if (e.isTrusted && el?.tagName === 'INPUT' && !PM.menuShown()) offerMenu(el);
+  }, true);
+
+  async function offerMenu(el) {
     if (PM.fillingProfile) return;
     const cardRole = PM.cardRole(el);
-    if (cardRole && cardRole !== 'csc' && cardRole !== 'zip') return showFieldMenu(el, 'card');
-    if (PM.profileRole(el)) return showFieldMenu(el, 'profile');
+    if (cardRole && cardRole !== 'csc' && cardRole !== 'zip') return showFieldMenu(el, 'card').then(() => true);
+    if (PM.profileRole(el)) return showFieldMenu(el, 'profile').then(() => true);
     const role = PM.classifyField(el)?.role;
-    if (role !== 'username' && role !== 'password') return;
+    if (role !== 'username' && role !== 'password') return false;
     const token = (focusToken = {});
     const g = PM.analyzeGroup(PM.findRoot(el));
     const wantsSaved = el === g.current || (el === g.username && (g.kind === 'login' || g.kind === 'username-step'));
@@ -132,7 +146,8 @@
     }
     if (wantsGenerated) items.push(generatedItem(g));
     if (token === focusToken && items.length) PM.showMenu(el, items);
-  }, true);
+    return items.length > 0;
+  }
 
   const hideTopMenu = () => {
     if (!menuInTop) return;

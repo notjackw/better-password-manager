@@ -128,6 +128,8 @@
     placeMenu();
   };
 
+  PM.menuShown = () => Boolean(menu);
+
   PM.hideMenu = () => {
     menu?.remove();
     menu = null;

@@ -9,6 +9,8 @@
     new: '#c026d3',
     confirm: '#7c3aed',
     otp: '#ea580c',
+    address: '#0d9488',
+    card: '#ca8a04',
     ignored: '#9ca3af',
   };
 
@@ -30,12 +32,25 @@
     layer.replaceChildren();
     if (!on) return;
     const groups = new Map();
-    for (const el of PM.deepQueryAll(document, 'input')) {
-      if (!PM.isVisible(el) || !PM.classifyField(el)) continue;
-      const root = PM.findRoot(el);
-      if (!groups.has(root)) groups.set(root, PM.analyzeGroup(root));
-      const g = groups.get(root);
-      const role = describe(el, g);
+    const profile = new Map(PM.profileFields().map((f) => [f.el, f.role]));
+    for (const el of PM.deepQueryAll(document, 'input, select')) {
+      if (!PM.isVisible(el)) continue;
+      let role;
+      let label;
+      if (PM.cardRole(el)) {
+        role = 'card';
+        label = `card · ${PM.cardRole(el)}`;
+      } else if (profile.has(el)) {
+        role = 'address';
+        label = `address · ${profile.get(el)}`;
+      } else {
+        if (el.tagName !== 'INPUT' || !PM.classifyField(el)) continue;
+        const root = PM.findRoot(el);
+        if (!groups.has(root)) groups.set(root, PM.analyzeGroup(root));
+        const g = groups.get(root);
+        role = describe(el, g);
+        label = `${role} · ${g.kind || 'no form'}`;
+      }
       const r = el.getBoundingClientRect();
       const box = document.createElement('div');
       box.className = 'box';
@@ -46,7 +61,7 @@
       const tag = document.createElement('span');
       tag.className = 'tag';
       tag.style.background = COLORS[role];
-      tag.textContent = `${role} · ${g.kind || 'no form'}`;
+      tag.textContent = label;
       box.append(tag);
       layer.append(box);
     }
